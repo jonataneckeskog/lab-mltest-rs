@@ -1,4 +1,4 @@
+mod agent;
+mod agent_memory;
 mod instructions;
-mod memory;
 mod multiverse;
-mod vm_network;

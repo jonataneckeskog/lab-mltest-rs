@@ -24,3 +24,5 @@ impl PrivateBanks {
         &mut self.0[bank_idx]
     }
 }
+
+pub struct SharedBanks([[u8; 256]; 2]);

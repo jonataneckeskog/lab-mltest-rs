@@ -1,4 +1,4 @@
-use crate::neural::memory::{PrivateBanks, SharedBanks};
+use crate::neural::agent_memory::{PrivateBanks, SharedBanks};
 
 pub struct Agent {
     genome: Vec<u8>,
@@ -6,11 +6,6 @@ pub struct Agent {
     acc: u8,
     energy: f32,
     private_banks: PrivateBanks,
-}
-
-pub struct Community {
-    agents: Vec<Agent>,
-    shared_comms: SharedBanks,
 }
 
 impl Agent {
