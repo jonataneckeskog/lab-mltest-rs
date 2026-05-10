@@ -14,9 +14,17 @@ pub struct Community {
 }
 
 impl Agent {
-    pub fn execute(&mut self, shared: &mut SharedBanks) {
+    pub fn load_input(&mut self, data: &[u8]) -> &mut Self {
+        self.private_banks.write_input(data);
+        self
+    }
+
+    pub fn execute(&mut self, shared: &mut SharedBanks) -> &mut Self {
         // Logic here...
-        let val = shared[0][10]; // Read from b6
-        shared[1][20] = self.acc; // Write to b7
+        self
+    }
+
+    pub fn collect_output(&self) -> Vec<u8> {
+        self.private_banks.read_output()
     }
 }
