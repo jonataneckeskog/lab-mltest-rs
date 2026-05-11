@@ -1,31 +1,63 @@
-#[repr(u8)]
-pub enum OPCode {
-    // Pipe
-    NoOP = 0, // No Operation
-    Jump = 1, // Jump with offset of +-128
+pub mod op {
+    // --- Pipe & Stack Manipulation ---
+    pub const NO_OP: u8 = 0; // No Operation
+    pub const HALT: u8 = 1; // Completely stops the program, confidence rating 0-255
+    pub const POP: u8 = 2; // Discard the top value (a -- )
+    pub const DUP: u8 = 3; // Duplicate the top value (a -- a, a)
+    pub const SWAP: u8 = 4; // Swap the top two values (a, b -- b, a)
+    pub const PUSH: u8 = 5; // Followed by 1 byte: Push immediate to stack ( -- imm)
+    pub const OVER: u8 = 6; // Copies the second item to the top (a, b -- a, b, a)
 
-    // Arithmetic
-    AddImm = 2,    // Add Immediate to acc
-    XorImm = 3,    // Xor Immediate with acc
-    AndImm = 4,    // And Immediate with acc
-    OrImm = 5,     // Or Immediate with acc
-    ShiftImm = 6,  // Shift Immediate with acc
-    RotateImm = 7, // Rotate Immediate with acc
+    // --- Arithmetic & Logic --
+    // These pop the top two values, perform math, and push the result
+    pub const ADD: u8 = 10; // (a, b -- a+b)
+    pub const SUB: u8 = 11; // (a, b -- a-b)
+    pub const XOR: u8 = 12; // (a, b -- a^b)
+    pub const AND: u8 = 13; // (a, b -- a&b)
+    pub const OR: u8 = 14; // (a, b -- a|b)
+    pub const NOT: u8 = 15; // Bitwise NOT (a -- !a)
+    pub const SHL: u8 = 16; // Shift Left (val, amt -- res)
+    pub const SHR: u8 = 17; // Shift Right (val, amt -- res)
+    pub const MUL: u8 = 18; // (a, b -- a*b)
+    pub const DIV: u8 = 19; // (a, b -- a/b)
+    pub const MOD: u8 = 20; // (a, b -- a%b)
 
-    AddBase = 8,     // Add Memory[mp] to acc
-    XorBase = 16,    // Xor Memory[mp] with acc
-    AndBase = 24,    // And Memory[mp] with acc
-    OrBase = 32,     // Or Memory[mp] with acc
-    ShiftBase = 40,  // Shift Memory[mp] with acc
-    RotateBase = 48, // Rotate Memory[mp] with acc
+    // --- Memory Interaction (8 Chambers) ---
+    // Followed by a one byte memory address.
 
-    // Control flow
-    BGTImm = 70, // Jumps with offset if acc > Immediate
-    BEImm = 71,  // Jumps with offset if acc == Immediate
+    // Load: Memory[addr] -> Stack
+    pub const LOAD_BASE: u8 = 24;
+    pub const LOAD_BASE_IND: u8 = 32;
 
-    BGTBase = 64, // Jumps with offset if acc > Memory[mp]
-    BEBase = 72,  // Jumps with offset if acc == Memory[mp]
+    // Store: Stack -> Memory[addr] (Copies the value)
+    pub const STORE_BASE: u8 = 40;
+    pub const STORE_BASE_IND: u8 = 48;
 
-    // Meta
-    Not = 100, // Reverses the operation of the next instruction
+    // Copy chunks of data
+    pub const COPY_BASE: u8 = 56;
+    pub const COPY_BASE_IND: u8 = 64;
+
+    // --- Control Flow ---
+    pub const JUMP: u8 = 72; // Followed by 1 byte: Unconditional jump (signed offset)
+    pub const JUMP_IF: u8 = 73; // Followed by 1 byte: Pop stack; if value != 0, jump.
+    pub const JUMP_IF_NOT: u8 = 74; // Followed by 1 byte: Pop stack; if value == 0, jump.
+
+    // Comparisons: Pop 2 values, push 1 (true) or 0 (false)
+    pub const EQ: u8 = 80; // (a, b -- a==b)
+    pub const GT: u8 = 81; // (a, b -- a>b)
+    pub const LT: u8 = 82; // (a, b -- a<b)
+
+    pub const CALL: u8 = 83; // Followed by 1 byte: Call immediate address
+    pub const CALL_IND: u8 = 84; // Pop stack, call that address
+    pub const RET: u8 = 85; // Pop return stack and jump back
+
+    // --- Meta ---
+    // Lets the network change itself while running
+    pub const REF_IND: u8 = 100; // Allows the AI to rewrite itself (v, o --)
+    pub const SELECT: u8 = 101; // (val_a, val_b, cond -- result)
+
+    // --- Self awareness ---
+    pub const GET_SP: u8 = 248; // Pushes the Stack Pointer to stack
+    pub const GET_ENERGY: u8 = 249; // Pushes the current Energy to stack
+    pub const RNG: u8 = 250; // Pushes a random byte ( -- v)
 }
