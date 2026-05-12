@@ -1,5 +1,4 @@
 use super::byte_stack::ByteStack;
-use std::default;
 
 use crate::neural::{
     agent_memory::{PrivateBanks, SharedBanks},
@@ -23,7 +22,6 @@ impl Agent {
         let mut nbr_executed = 0;
 
         let mut stack = ByteStack::new();
-        let mut sp = 0;
 
         while nbr_executed < max_steps && pc < self.genome.len() {
             let instruction = self.genome[pc];
@@ -39,15 +37,133 @@ impl Agent {
                     stack.push(stack.peek());
                 }
                 op::SWAP => {
-                    let a = stack.pop();
-                    let b = stack.pop();
-                    stack.push(a);
-                    stack.push(b);
+                    stack.swap();
                 }
                 op::PUSH => {
                     let value = self.genome[pc];
                     stack.push(value);
                     pc += 1;
+                }
+                op::OVER => {
+                    stack.over();
+                }
+                op::ADD => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a.wrapping_add(b));
+                }
+                op::SUB => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a.wrapping_sub(b));
+                }
+                op::XOR => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a ^ b);
+                }
+                op::AND => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a & b);
+                }
+                op::OR => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a | b);
+                }
+                op::NOT => {
+                    let a = stack.pop();
+                    stack.push(!a);
+                }
+                op::SHL => {
+                    let amt = stack.pop();
+                    let val = stack.pop();
+                    stack.push(val.wrapping_shl(amt as u32));
+                }
+                op::SHR => {
+                    let amt = stack.pop();
+                    let val = stack.pop();
+                    stack.push(val.wrapping_shr(amt as u32));
+                }
+                op::MUL => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(a.wrapping_mul(b));
+                }
+                op::DIV => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(if b == 0 { 0 } else { a.wrapping_div(b) });
+                }
+                op::MOD => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(if b == 0 { 0 } else { a.wrapping_rem(b) });
+                }
+                op::LOAD_BASE | op::LOAD_IND_BASE => {
+                    // TODO: Memory Interaction (Load)
+                }
+                op::STORE_BASE | op::STORE_IND_BASE => {
+                    // TODO: Memory Interaction (Store)
+                }
+                op::LOADC_BASE | op::LOADC_IND_BASE => {
+                    // TODO: Memory Interaction (Copy chunks)
+                    // Note: STOREC_BASE and STOREC_IND_BASE share the same opcodes
+                }
+                op::JUMP => {
+                    // TODO: Control flow jump
+                }
+                op::JUMP_IF => {
+                    // TODO: Control flow jump if
+                }
+                op::JUMP_IF_NOT => {
+                    // TODO: Control flow jump if not
+                }
+                op::EQ => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(if a == b { 1 } else { 0 });
+                }
+                op::GT => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(if a > b { 1 } else { 0 });
+                }
+                op::LT => {
+                    let b = stack.pop();
+                    let a = stack.pop();
+                    stack.push(if a < b { 1 } else { 0 });
+                }
+                op::CALL => {
+                    // TODO: Call immediate address
+                }
+                op::CALL_IND => {
+                    // TODO: Pop stack, call that address
+                }
+                op::RET => {
+                    // TODO: Pop return stack and jump back
+                }
+                op::REF_IND => {
+                    // TODO: Allows AI to rewrite itself
+                }
+                op::SELECT => {
+                    let cond = stack.pop();
+                    let val_b = stack.pop();
+                    let val_a = stack.pop();
+                    stack.push(if cond != 0 { val_a } else { val_b });
+                }
+                op::GET_SP => {
+                    // TODO: Pushes the Stack Pointer to stack
+                }
+                op::GET_PC => {
+                    // TODO: Pushes the Program Counter to stack
+                }
+                op::GET_ENERGY => {
+                    // TODO: Pushes the current Energy to stack
+                }
+                op::RNG => {
+                    // TODO: Pushes a random byte
                 }
                 _ => {}
             }

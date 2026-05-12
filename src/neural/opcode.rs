@@ -37,7 +37,7 @@ pub mod op {
     pub const LOADC_BASE: u8 = 56;
     pub const LOADC_IND_BASE: u8 = 64;
 
-    // Copy chunks of data Stack Amount -> Memory[addr] (addr, amt --)
+    // Copy chunks of data Stack Amount -> Memory[addr] (addr, amt)
     pub const STOREC_BASE: u8 = 56;
     pub const STOREC_IND_BASE: u8 = 64;
 
@@ -62,6 +62,7 @@ pub mod op {
 
     // --- Self awareness ---
     pub const GET_SP: u8 = 248; // Pushes the Stack Pointer to stack
-    pub const GET_ENERGY: u8 = 249; // Pushes the current Energy to stack
-    pub const RNG: u8 = 250; // Pushes a random byte ( -- v)
+    pub const GET_PC: u8 = 249; // Pushes the Program Counter to stack
+    pub const GET_ENERGY: u8 = 250; // Pushes the current Energy to stack
+    pub const RNG: u8 = 251; // Pushes a random byte ( -- v)
 }
