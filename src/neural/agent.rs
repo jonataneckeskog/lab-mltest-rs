@@ -17,7 +17,12 @@ impl Agent {
         self
     }
 
-    pub fn execute(&mut self, shared: &mut SharedBanks, max_steps: usize) -> &mut Self {
+    pub fn execute(
+        &mut self,
+        shared: &mut SharedBanks,
+        max_steps: usize,
+        op_costs: &[f32; 256],
+    ) -> &mut Self {
         let mut pc = 0;
         let mut nbr_executed = 0;
 
@@ -168,6 +173,7 @@ impl Agent {
                 _ => {}
             }
 
+            self.energy -= op_costs[instruction as usize];
             nbr_executed += 1;
         }
 
