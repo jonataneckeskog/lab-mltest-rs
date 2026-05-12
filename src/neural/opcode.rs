@@ -27,15 +27,19 @@ pub mod op {
 
     // Load: Memory[addr] -> Stack
     pub const LOAD_BASE: u8 = 24;
-    pub const LOAD_BASE_IND: u8 = 32;
+    pub const LOAD_IND_BASE: u8 = 32;
 
     // Store: Stack -> Memory[addr] (Copies the value)
     pub const STORE_BASE: u8 = 40;
-    pub const STORE_BASE_IND: u8 = 48;
+    pub const STORE_IND_BASE: u8 = 48;
 
-    // Copy chunks of data
-    pub const COPY_BASE: u8 = 56;
-    pub const COPY_BASE_IND: u8 = 64;
+    // Copy chunks of data Memory[addr] Amount -> Stack (addr, amt -- stack)
+    pub const LOADC_BASE: u8 = 56;
+    pub const LOADC_IND_BASE: u8 = 64;
+
+    // Copy chunks of data Stack Amount -> Memory[addr] (addr, amt --)
+    pub const STOREC_BASE: u8 = 56;
+    pub const STOREC_IND_BASE: u8 = 64;
 
     // --- Control Flow ---
     pub const JUMP: u8 = 72; // Followed by 1 byte: Unconditional jump (signed offset)
