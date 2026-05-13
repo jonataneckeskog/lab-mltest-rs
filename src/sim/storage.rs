@@ -179,6 +179,7 @@ mod tests {
         let manifest = CommunityManifest {
             agents: vec![AgentManifest {
                 energy: 10.0,
+                base_genome_path: std::path::PathBuf::from("bg.bin"),
                 genome_path: std::path::PathBuf::from("g.bin"),
                 banks: BankManifest {
                     raw_data_path: std::path::PathBuf::from("b.bin"),

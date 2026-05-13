@@ -1,5 +1,5 @@
 use crate::neural::{
-    agent::Agent,
+    agent::{Agent, Genome},
     agent_memory::{Bank, BankMetadata},
 };
 
@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 #[derive(Serialize, Deserialize)]
 pub struct AgentManifest {
     pub energy: f32,
+    pub base_genome_path: PathBuf,
     pub genome_path: PathBuf,
     pub banks: BankManifest,
 }
@@ -60,13 +61,18 @@ impl BankManifest {
 impl Agent {
     pub fn save(&self, id: &str, folder: &Path) -> std::io::Result<AgentManifest> {
         let genome_filename = format!("genome_{}.bin", id);
+        let base_genome_filename = format!("base_genome_{}.bin", id);
         std::fs::write(folder.join(&genome_filename), &self.genome)?;
-
+        std::fs::write(
+            folder.join(&base_genome_filename),
+            self.base_genome.0.as_ref(),
+        )?;
         let bank_manifest = self.private_banks.save(id, folder)?;
 
         Ok(AgentManifest {
             energy: self.energy.0,
             genome_path: PathBuf::from(genome_filename),
+            base_genome_path: PathBuf::from(base_genome_filename),
             banks: bank_manifest,
         })
     }
@@ -75,13 +81,15 @@ impl Agent {
 impl AgentManifest {
     pub fn load(&self, base_dir: &Path) -> anyhow::Result<Agent> {
         let genome = std::fs::read(base_dir.join(&self.genome_path))?;
+        let base_genome = std::fs::read(base_dir.join(&self.base_genome_path))?;
 
         let banks = self.banks.load(base_dir)?;
 
         Ok(Agent {
-            genome,
-            energy: OrderedFloat(self.energy),
+            genome: genome,
+            base_genome: Genome::new(base_genome),
             private_banks: banks,
+            energy: OrderedFloat(self.energy),
         })
     }
 }
@@ -170,6 +178,7 @@ mod tests {
         // Tests if the AgentManifest JSON/Bincode itself is valid
         let manifest = AgentManifest {
             energy: 10.0,
+            base_genome_path: PathBuf::from("bg.bin"),
             genome_path: PathBuf::from("g.bin"),
             banks: BankManifest {
                 raw_data_path: PathBuf::from("b.bin"),

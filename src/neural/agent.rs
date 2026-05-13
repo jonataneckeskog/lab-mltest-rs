@@ -1,19 +1,32 @@
+use std::sync::Arc;
+
 use crate::neural::agent_memory::PrivateBanks;
 use ordered_float::OrderedFloat;
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct Genome(pub Arc<Vec<u8>>);
+
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct Agent {
+    pub(crate) base_genome: Genome,
     pub(crate) genome: Vec<u8>,
-    pub(crate) energy: OrderedFloat<f32>,
     pub(crate) private_banks: PrivateBanks,
+    pub(crate) energy: OrderedFloat<f32>,
+}
+
+impl Genome {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self(Arc::new(data))
+    }
 }
 
 impl Default for Agent {
     fn default() -> Self {
         Agent {
+            base_genome: Genome(Arc::new(Vec::with_capacity(32))),
             genome: Vec::with_capacity(32),
-            energy: OrderedFloat(100.0),
             private_banks: PrivateBanks::default(),
+            energy: OrderedFloat(100.0),
         }
     }
 }
