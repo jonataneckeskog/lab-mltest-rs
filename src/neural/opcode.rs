@@ -7,6 +7,8 @@ pub mod op {
     pub const SWAP: u8 = 4; // Swap the top two values (a, b -- b, a)
     pub const PUSH: u8 = 5; // Followed by 1 byte: Push immediate to stack ( -- imm)
     pub const OVER: u8 = 6; // Copies the second item to the top (a, b -- a, b, a)
+    pub const SELECT: u8 = 7; // (val_a, val_b, cond -- result)
+    pub const EXEC_STACK: u8 = 8; // Execute the top value as an opcode (val --)
 
     // --- Arithmetic & Logic --
     // These pop the top two values, perform math, and push the result
@@ -64,13 +66,22 @@ pub mod op {
     pub const RET: u8 = 108; // Pop return stack and jump back
 
     // --- Meta ---
-    // Lets the network change itself while running
-    pub const REF_IND: u8 = 109; // Allows the AI to rewrite itself (v, o --)
-    pub const SELECT: u8 = 110; // (val_a, val_b, cond -- result)
+
+    // Within agent
+    pub const REF_IND: u8 = 200; // Allows the AI to rewrite itself (v, o --)
+    pub const DOUBLE_SIZE: u8 = 201; // Doubles the genome size (up to a set max bytes)
+    pub const HALF_SIZE: u8 = 202; // Halves the genome size (down to a set min bytes)
+    pub const DIE: u8 = 203; // ( -- ) Kills the agent immediately
+
+    // Communicating with 'the world'
+    pub const LEAVE_COMMUNITY: u8 = 204; // (c --) Leaves the current community
+    pub const SPAWN_CHILD: u8 = 205; // 2 bytes: (mutated genome, energy)
 
     // --- Self awareness ---
     pub const GET_SP: u8 = 248; // Pushes the Stack Pointer to stack
     pub const GET_PC: u8 = 249; // Pushes the Program Counter to stack
     pub const GET_ENERGY: u8 = 250; // Pushes the current Energy to stack
-    pub const RNG: u8 = 251; // Pushes a random byte ( -- v)
+    pub const GET_ID: u8 = 251; // Pushes the Agent's unique ID to stack
+    pub const GET_COMMUNITY_ID: u8 = 252; // Pushes the current Community ID to stack
+    pub const RNG: u8 = 253; // Pushes a random byte ( -- v)
 }

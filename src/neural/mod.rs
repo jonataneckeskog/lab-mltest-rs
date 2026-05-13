@@ -10,6 +10,6 @@ mod storage;
 pub use agent::Agent;
 pub use agent_memory::SharedBanks;
 pub use config::OP_COSTS;
-pub use execution::{AgentExecutor, ExecutionResult};
+pub use execution::{AgentExecutor, ExecutionSummary, SysCall, TerminationReason};
 pub use spawner::AgentSpawner;
 pub use storage::{AgentManifest, BankManifest};
