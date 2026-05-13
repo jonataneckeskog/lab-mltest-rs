@@ -2,12 +2,34 @@ use serde::{Deserialize, Serialize};
 use serde_with::{Bytes, serde_as};
 
 #[serde_as]
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
-pub struct PrivateBanks(#[serde_as(as = "[Bytes; 6]")] pub(crate) [[u8; 256]; 6]);
+#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, PartialOrd, Ord)]
+pub struct Bank<const N: usize>(#[serde_as(as = "[Bytes; N]")] pub(crate) [[u8; 256]; N]);
 
-#[serde_as]
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
-pub struct SharedBanks(#[serde_as(as = "[Bytes; 2]")] pub(crate) [[u8; 256]; 2]);
+pub trait BankMetadata {
+    const PREFIX: &'static str;
+}
+
+pub type PrivateBanks = Bank<6>;
+pub type SharedBanks = Bank<2>;
+
+impl BankMetadata for Bank<6> {
+    const PREFIX: &'static str = "private_banks";
+}
+impl BankMetadata for Bank<2> {
+    const PREFIX: &'static str = "shared_banks";
+}
+
+impl<const N: usize> Default for Bank<N> {
+    fn default() -> Self {
+        Bank([[0u8; 256]; N])
+    }
+}
+
+impl<const N: usize> Bank<N> {
+    pub fn raw_mut(&mut self, bank_idx: usize) -> &mut [u8; 256] {
+        &mut self.0[bank_idx]
+    }
+}
 
 impl PrivateBanks {
     pub fn write_input(&mut self, data: &[u8]) {
@@ -26,28 +48,5 @@ impl PrivateBanks {
 
         // Output the valid range of the output bank
         bank[1..end].to_vec()
-    }
-
-    // This allows the Agent's internal VM to still touch raw bytes
-    pub fn raw_mut(&mut self, bank_idx: usize) -> &mut [u8; 256] {
-        &mut self.0[bank_idx]
-    }
-}
-
-impl Default for PrivateBanks {
-    fn default() -> Self {
-        PrivateBanks([[0u8; 256]; 6])
-    }
-}
-
-impl SharedBanks {
-    pub fn raw_mut(&mut self, bank_idx: usize) -> &mut [u8; 256] {
-        &mut self.0[bank_idx]
-    }
-}
-
-impl Default for SharedBanks {
-    fn default() -> Self {
-        SharedBanks([[0u8; 256]; 2])
     }
 }

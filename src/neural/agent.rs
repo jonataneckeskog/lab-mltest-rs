@@ -4,11 +4,23 @@ use crate::neural::{
     agent_memory::{PrivateBanks, SharedBanks},
     opcode::op,
 };
+use ordered_float::OrderedFloat;
 
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct Agent {
-    genome: Vec<u8>,
-    energy: f32,
-    private_banks: PrivateBanks,
+    pub(crate) genome: Vec<u8>,
+    pub(crate) energy: OrderedFloat<f32>,
+    pub(crate) private_banks: PrivateBanks,
+}
+
+impl Default for Agent {
+    fn default() -> Self {
+        Agent {
+            genome: Vec::with_capacity(32),
+            energy: OrderedFloat(100.0),
+            private_banks: PrivateBanks::default(),
+        }
+    }
 }
 
 impl Agent {
@@ -19,7 +31,7 @@ impl Agent {
 
     pub fn execute(
         &mut self,
-        shared: &mut SharedBanks,
+        _shared: &mut SharedBanks,
         max_steps: usize,
         op_costs: &[f32; 256],
     ) -> &mut Self {
