@@ -272,13 +272,19 @@ impl Agent {
                     stack.push(self.energy.0 as u8);
                 }
                 op::RNG => {
-                    stack.push(
-                        (std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_nanos()
-                            ^ nbr_executed as u128) as u8,
-                    );
+                    let mut val = (nbr_executed as usize)
+                        .wrapping_add(pc)
+                        .wrapping_add(stack.len())
+                        .wrapping_add(self.energy.0 as usize);
+
+                    // Simple high-speed bit-mixer
+                    // This ensures that even if inputs only changes by small margins,
+                    // the resulting u8 is wildly different.
+                    val = (val ^ (val >> 16)).wrapping_mul(0x85ebca6b);
+                    val = (val ^ (val >> 13)).wrapping_mul(0xc2b2ae35);
+                    val ^= val >> 16;
+
+                    stack.push(val as u8);
                 }
                 _ => {}
             }
