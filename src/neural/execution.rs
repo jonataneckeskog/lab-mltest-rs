@@ -1,4 +1,4 @@
-use crate::neural::{Agent, SharedBanks, byte_stack::ByteStack, opcode::op};
+use crate::neural::{Agent, SharedBanks, agent::Genome, byte_stack::ByteStack, opcode::op};
 
 pub struct AgentExecutor<'a> {
     agent: &'a mut Agent,
@@ -18,8 +18,8 @@ pub enum TerminationReason {
 }
 
 pub enum SysCall {
-    SpawnChild { genome: Vec<u8>, energy: f32 },
-    LeaveCommunity { key: u8 },
+    SpawnChild { genome: Genome, energy: f32 },
+    LeaveCommunity { community_id: u8 },
 }
 
 impl<'a> AgentExecutor<'a> {
@@ -295,6 +295,35 @@ impl<'a> AgentExecutor<'a> {
                         let target = wrap_pc(pc as isize + offset);
                         self.agent.genome[target] = value;
                     }
+                    op::DOUBLE_SIZE => {
+                        let new_size = self.agent.genome.len() * 2;
+                        if new_size <= 4096 {
+                            self.agent.genome.resize(new_size, 0);
+                        }
+                    }
+                    op::HALF_SIZE => {
+                        let new_size = self.agent.genome.len() / 2;
+                        if new_size >= 32 {
+                            self.agent.genome.resize(new_size, 0);
+                        }
+                    }
+                    op::DIE => {
+                        return ExecutionSummary {
+                            reason: TerminationReason::Died,
+                            syscalls,
+                        };
+                    }
+                    op::LEAVE_COMMUNITY => {
+                        let community_id = stack.pop();
+                        syscalls.push(SysCall::LeaveCommunity { community_id });
+                    }
+                    op::SPAWN_CHILD => {
+                        let val_u8 = stack.pop();
+                        let energy = (val_u8 as f32) * 0.39215686; // Scale 0-255 to 0-100
+                        let genome = self.agent.base_genome.clone();
+                        syscalls.push(SysCall::SpawnChild { genome, energy });
+                        self.agent.energy -= energy;
+                    }
                     op::GET_SP => {
                         stack.push(stack.len() as u8);
                     }
@@ -303,6 +332,12 @@ impl<'a> AgentExecutor<'a> {
                     }
                     op::GET_ENERGY => {
                         stack.push(self.agent.energy.0 as u8);
+                    }
+                    op::GET_ID => {
+                        // TODO
+                    }
+                    op::GET_COMMUNITY_ID => {
+                        // TODO
                     }
                     op::RNG => {
                         let mut val = (nbr_executed as usize)

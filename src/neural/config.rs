@@ -14,6 +14,9 @@ pub const OP_COSTS: [f32; 256] = {
         // Tier 0: Negligible
         op::HALT         => 0.0,
         op::NO_OP        => 0.001,
+        op::PUSH         => 0.002, // Encourage using the stack
+        op::EXEC_STACK     => 0.005,
+        op::DIE         => 0.0,    // Dying is free
 
         // Tier 2: Control Flow (Slightly more expensive due to branching)
         op::JUMP         => 0.015,
@@ -30,6 +33,10 @@ pub const OP_COSTS: [f32; 256] = {
 
         // Tier 4: System/Special
         op::REF_IND      => 0.08,   // Self-mutation/Genome rewriting
+        op::LEAVE_COMMUNITY => 1.0,    // Interacting with the world is costly
+        op::SPAWN_CHILD     => 1.0,    // Spawning is very costly
+        op::DOUBLE_SIZE  => 0.4,
+        op::HALF_SIZE    => 0.2,
         op::RNG          => 0.03,   // Pseudo-random RNG is somewhat encouraged
     });
 
