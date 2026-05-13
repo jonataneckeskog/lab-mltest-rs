@@ -133,7 +133,7 @@ mod tests {
         let manifest = banks.save("io_test", dir.path())?;
         let loaded = manifest.load::<6>(dir.path())?;
 
-        assert_eq!(loaded.read_output(), vec![]); // Output bank should still be empty
+        assert_eq!(loaded.read_output(), Vec::<u8>::new()); // Output bank should still be empty
         // Re-verify input was saved
         assert_eq!(loaded.0[0][1], 10);
         Ok(())
