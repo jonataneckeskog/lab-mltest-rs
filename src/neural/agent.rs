@@ -118,15 +118,29 @@ impl Agent {
                     let a = stack.pop();
                     stack.push(if b == 0 { 0 } else { a.wrapping_rem(b) });
                 }
-                op::LOAD_BASE | op::LOAD_IND_BASE => {
+                op::LOAD_BASE => {
                     // TODO: Memory Interaction (Load)
                 }
-                op::STORE_BASE | op::STORE_IND_BASE => {
+                op::LOAD_IND_BASE => {
+                    // TODO: Memory Interaction (Load)
+                }
+                op::STORE_BASE => {
                     // TODO: Memory Interaction (Store)
                 }
-                op::LOADC_BASE | op::LOADC_IND_BASE => {
+                op::STORE_IND_BASE => {
+                    // TODO: Memory Interaction (Store)
+                }
+                op::LOADC_BASE => {
                     // TODO: Memory Interaction (Copy chunks)
-                    // Note: STOREC_BASE and STOREC_IND_BASE share the same opcodes
+                }
+                op::LOADC_IND_BASE => {
+                    // TODO: Memory Interaction (Copy chunks)
+                }
+                op::STOREC_BASE => {
+                    // TODO: Memory Interaction (Copy chunks)
+                }
+                op::STOREC_IND_BASE => {
+                    // TODO: Memory Interaction (Copy chunks)
                 }
                 op::JUMP => {
                     // TODO: Control flow jump

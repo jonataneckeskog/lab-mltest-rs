@@ -38,27 +38,27 @@ pub mod op {
     pub const LOADC_IND_BASE: u8 = 64;
 
     // Copy chunks of data Stack Amount -> Memory[addr] (addr, amt)
-    pub const STOREC_BASE: u8 = 56;
-    pub const STOREC_IND_BASE: u8 = 64;
+    pub const STOREC_BASE: u8 = 72;
+    pub const STOREC_IND_BASE: u8 = 80;
 
     // --- Control Flow ---
-    pub const JUMP: u8 = 72; // Followed by 1 byte: Unconditional jump (signed offset)
-    pub const JUMP_IF: u8 = 73; // Followed by 1 byte: Pop stack; if value != 0, jump.
-    pub const JUMP_IF_NOT: u8 = 74; // Followed by 1 byte: Pop stack; if value == 0, jump.
+    pub const JUMP: u8 = 100; // Followed by 1 byte: Unconditional jump (signed offset)
+    pub const JUMP_IF: u8 = 101; // Followed by 1 byte: Pop stack; if value != 0, jump.
+    pub const JUMP_IF_NOT: u8 = 102; // Followed by 1 byte: Pop stack; if value == 0, jump.
 
     // Comparisons: Pop 2 values, push 1 (true) or 0 (false)
-    pub const EQ: u8 = 80; // (a, b -- a==b)
-    pub const GT: u8 = 81; // (a, b -- a>b)
-    pub const LT: u8 = 82; // (a, b -- a<b)
+    pub const EQ: u8 = 103; // (a, b -- a==b)
+    pub const GT: u8 = 104; // (a, b -- a>b)
+    pub const LT: u8 = 105; // (a, b -- a<b)
 
-    pub const CALL: u8 = 83; // Followed by 1 byte: Call immediate address
-    pub const CALL_IND: u8 = 84; // Pop stack, call that address
-    pub const RET: u8 = 85; // Pop return stack and jump back
+    pub const CALL: u8 = 106; // Followed by 1 byte: Call immediate address
+    pub const CALL_IND: u8 = 107; // Pop stack, call that address
+    pub const RET: u8 = 108; // Pop return stack and jump back
 
     // --- Meta ---
     // Lets the network change itself while running
-    pub const REF_IND: u8 = 100; // Allows the AI to rewrite itself (v, o --)
-    pub const SELECT: u8 = 101; // (val_a, val_b, cond -- result)
+    pub const REF_IND: u8 = 109; // Allows the AI to rewrite itself (v, o --)
+    pub const SELECT: u8 = 110; // (val_a, val_b, cond -- result)
 
     // --- Self awareness ---
     pub const GET_SP: u8 = 248; // Pushes the Stack Pointer to stack
