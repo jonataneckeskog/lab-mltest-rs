@@ -11,3 +11,4 @@ serde_with = { version = "3.20.0", features = ["macros"] }
 ordered-float = { version = "4.6", features = ["serde"] }
 anyhow = "1.0.102"
 tempfile = "3.27.0"
+rand = "0.10.1"
