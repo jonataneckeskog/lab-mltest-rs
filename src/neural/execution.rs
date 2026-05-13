@@ -42,6 +42,9 @@ impl<'a> AgentExecutor<'a> {
             &self.shared.0[1],
         ];
 
+        let genome_mask = self.agent.genome.len().saturating_sub(1);
+        let wrap_pc = |pos: isize| -> usize { (pos as usize) & genome_mask };
+
         while nbr_executed < max_steps && pc < self.agent.genome.len() && self.agent.energy.0 > 0.0
         {
             let instruction = self.agent.genome[pc];
@@ -205,23 +208,23 @@ impl<'a> AgentExecutor<'a> {
                     self.agent.energy -= self.op_costs[instruction as usize] * log_scale;
                 }
                 op::JUMP => {
-                    let offset = self.agent.genome[pc] as i8;
-                    pc = (pc as i32 + 1 + offset as i32).max(0) as usize;
+                    let offset = self.agent.genome[pc] as i8 as isize;
+                    pc = wrap_pc(pc as isize + 1 + offset);
                 }
                 op::JUMP_IF => {
-                    let offset = self.agent.genome[pc] as i8;
+                    let offset = self.agent.genome[pc] as i8 as isize;
                     pc += 1;
                     let cond = stack.pop();
                     if cond != 0 {
-                        pc = (pc as i32 + offset as i32).max(0) as usize;
+                        pc = wrap_pc(pc as isize + offset);
                     }
                 }
                 op::JUMP_IF_NOT => {
-                    let offset = self.agent.genome[pc] as i8;
+                    let offset = self.agent.genome[pc] as i8 as isize;
                     pc += 1;
                     let cond = stack.pop();
                     if cond == 0 {
-                        pc = (pc as i32 + offset as i32).max(0) as usize;
+                        pc = wrap_pc(pc as isize + offset);
                     }
                 }
                 op::EQ => {
@@ -240,16 +243,16 @@ impl<'a> AgentExecutor<'a> {
                     stack.push(if a < b { 1 } else { 0 });
                 }
                 op::CALL => {
-                    let offset = self.agent.genome[pc] as i8;
+                    let offset = self.agent.genome[pc] as i8 as isize;
                     pc += 1;
                     call_stack.push(pc);
-                    pc = (pc as i32 + offset as i32).max(0) as usize;
+                    pc = wrap_pc(pc as isize + offset);
                 }
 
                 op::CALL_IND => {
-                    let offset = stack.pop() as i32;
+                    let offset = stack.pop() as i8 as isize;
                     call_stack.push(pc);
-                    pc = (pc as i32 + offset).max(0) as usize;
+                    pc = wrap_pc(pc as isize + offset);
                 }
                 op::RET => {
                     if let Some(ret_addr) = call_stack.pop() {
@@ -257,12 +260,10 @@ impl<'a> AgentExecutor<'a> {
                     }
                 }
                 op::REF_IND => {
-                    let offset = stack.pop() as i8;
+                    let offset = stack.pop() as i8 as isize;
                     let value = stack.pop();
-                    let target = (pc as i32 + offset as i32).max(0) as usize;
-                    if target < self.agent.genome.len() {
-                        self.agent.genome[target] = value;
-                    }
+                    let target = wrap_pc(pc as isize + offset);
+                    self.agent.genome[target] = value;
                 }
                 op::SELECT => {
                     let cond = stack.pop();
