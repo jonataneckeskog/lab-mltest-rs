@@ -1,11 +1,17 @@
 use crate::neural::opcode::op;
 
-// Costs for opcodes 0 to 255
-pub const OP_COSTS: [f32; 256] = {
-    let mut costs = [0.01; 256]; // Default cost
-    costs[op::NO_OP as usize] = 0.001;
-    costs[op::MUL as usize] = 0.05;
-    costs[op::DIV as usize] = 0.05;
-    costs[op::REF_IND as usize] = 0.5; // High cost for self-mutation
-    costs
-};
+macro_rules! define_costs {
+    (default: $default:expr, { $($op:expr => $cost:expr),* $(,)? }) => {{
+        let mut costs = [$default; 256];
+        $( costs[$op as usize] = $cost; )*
+        costs
+    }};
+}
+
+pub const OP_COSTS: [f32; 256] = define_costs!(default: 0.01, {
+    op::NO_OP   => 0.001,
+    op::HALT    => 0.0,
+    op::MUL     => 0.05,
+    op::DIV     => 0.05,
+    op::REF_IND => 0.5,
+});
