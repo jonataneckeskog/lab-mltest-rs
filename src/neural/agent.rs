@@ -44,6 +44,7 @@ impl Agent {
         let mut nbr_executed = 0;
 
         let mut stack = ByteStack::new();
+        let mut call_stack: Vec<usize> = Vec::with_capacity(8);
 
         let bank_ptrs: [*const [u8; 256]; 8] = [
             &self.private_banks.0[0],
@@ -177,6 +178,8 @@ impl Agent {
                     for i in 0..count {
                         stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                     }
+                    let log_scale = (usize::BITS - count.leading_zeros()) as f32;
+                    self.energy -= op_costs[instruction as usize] * log_scale;
                 }
                 op::LOADC_IND_BASE..=op::LOADC_IND_END => {
                     let bank_idx = (instruction - op::LOADC_IND_BASE) as usize;
@@ -186,6 +189,8 @@ impl Agent {
                     for i in 0..count {
                         stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                     }
+                    let log_scale = (usize::BITS - count.leading_zeros()) as f32;
+                    self.energy -= op_costs[instruction as usize] * log_scale;
                 }
                 op::STOREC_BASE..=op::STOREC_END => {
                     let bank_idx = (instruction - op::STOREC_BASE) as usize;
@@ -198,6 +203,8 @@ impl Agent {
                         let value = stack.pop();
                         unsafe { *(bank_ptrs[bank_idx] as *mut u8).add((addr + i) & 0xFF) = value };
                     }
+                    let log_scale = (usize::BITS - count.leading_zeros()) as f32;
+                    self.energy -= op_costs[instruction as usize] * log_scale;
                 }
                 op::STOREC_IND_BASE..=op::STOREC_IND_END => {
                     let bank_idx = (instruction - op::STOREC_IND_BASE) as usize;
@@ -208,6 +215,8 @@ impl Agent {
                         let value = stack.pop();
                         unsafe { *(bank_ptrs[bank_idx] as *mut u8).add((addr + i) & 0xFF) = value };
                     }
+                    let log_scale = (usize::BITS - count.leading_zeros()) as f32;
+                    self.energy -= op_costs[instruction as usize] * log_scale;
                 }
                 op::JUMP => {
                     let offset = self.genome[pc] as i8;
@@ -245,16 +254,29 @@ impl Agent {
                     stack.push(if a < b { 1 } else { 0 });
                 }
                 op::CALL => {
-                    // TODO: Call immediate address
+                    let offset = self.genome[pc] as i8;
+                    pc += 1;
+                    call_stack.push(pc);
+                    pc = (pc as i32 + offset as i32).max(0) as usize;
                 }
+
                 op::CALL_IND => {
-                    // TODO: Pop stack, call that address
+                    let offset = stack.pop() as i32;
+                    call_stack.push(pc);
+                    pc = (pc as i32 + offset).max(0) as usize;
                 }
                 op::RET => {
-                    // TODO: Pop return stack and jump back
+                    if let Some(ret_addr) = call_stack.pop() {
+                        pc = ret_addr;
+                    }
                 }
                 op::REF_IND => {
-                    // TODO: Allows AI to rewrite itself
+                    let offset = stack.pop() as i8;
+                    let value = stack.pop();
+                    let target = (pc as i32 + offset as i32).max(0) as usize;
+                    if target < self.genome.len() {
+                        self.genome[target] = value;
+                    }
                 }
                 op::SELECT => {
                     let cond = stack.pop();

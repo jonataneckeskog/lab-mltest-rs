@@ -17,23 +17,23 @@ pub const OP_COSTS: [f32; 256] = {
 
         // Tier 2: Control Flow (Slightly more expensive due to branching)
         op::JUMP         => 0.015,
-        op::JUMP_IF      => 0.015,
-        op::JUMP_IF_NOT  => 0.015,
-        op::CALL         => 0.02,
-        op::CALL_IND     => 0.025,
-        op::RET          => 0.02,
+        op::JUMP_IF      => 0.02,
+        op::JUMP_IF_NOT  => 0.02,
+        op::CALL         => 0.03,   // CALL is slightly more expensive due to call stack management
+        op::CALL_IND     => 0.03,
+        op::RET          => 0.06,   // RET is expensive due to return address handling
 
         // Tier 3: Complex Math
-        op::MUL          => 0.05,
-        op::DIV          => 0.05,
-        op::MOD          => 0.05,
+        op::MUL          => 0.04,
+        op::DIV          => 0.07,
+        op::MOD          => 0.07,
 
-        // Tier 4: System/Special (High overhead)
-        op::REF_IND      => 0.5,   // Self-mutation/Genome rewriting
-        op::RNG          => 0.1,   // Pseudo-random RNG is somewhat encouraged
+        // Tier 4: System/Special
+        op::REF_IND      => 0.08,   // Self-mutation/Genome rewriting
+        op::RNG          => 0.03,   // Pseudo-random RNG is somewhat encouraged
     });
 
-    // Bank Ranges
+    // Bank Ranges (Chunked instructions with varying costs based on size)
     let mut i = 0;
     while i < 8 {
         let idx = i as u8;
