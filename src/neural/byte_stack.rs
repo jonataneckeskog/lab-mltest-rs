@@ -11,6 +11,10 @@ impl ByteStack {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.sp as usize
+    }
+
     #[inline(always)]
     pub fn push(&mut self, val: u8) {
         self.data[self.sp as usize] = val;

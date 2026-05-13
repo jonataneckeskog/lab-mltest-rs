@@ -13,6 +13,12 @@ pub struct Agent {
     pub(crate) private_banks: PrivateBanks,
 }
 
+pub enum ExecutionResult {
+    Halted { confidence: u8 },
+    TimedOut,
+    Died,
+}
+
 impl Default for Agent {
     fn default() -> Self {
         Agent {
@@ -24,9 +30,8 @@ impl Default for Agent {
 }
 
 impl Agent {
-    pub fn load_input(&mut self, data: &[u8]) -> &mut Self {
+    pub fn load_input(&mut self, data: &[u8]) {
         self.private_banks.write_input(data);
-        self
     }
 
     pub fn execute(
@@ -34,19 +39,22 @@ impl Agent {
         _shared: &mut SharedBanks,
         max_steps: usize,
         op_costs: &[f32; 256],
-    ) -> &mut Self {
+    ) -> ExecutionResult {
         let mut pc = 0;
         let mut nbr_executed = 0;
 
         let mut stack = ByteStack::new();
 
-        while nbr_executed < max_steps && pc < self.genome.len() {
+        while nbr_executed < max_steps && pc < self.genome.len() && self.energy.0 > 0.0 {
             let instruction = self.genome[pc];
             pc += 1;
 
             match instruction {
                 op::NO_OP => {}
-                op::HALT => break,
+                op::HALT => {
+                    let confidence = stack.pop();
+                    return ExecutionResult::Halted { confidence };
+                }
                 op::POP => {
                     stack.pop();
                 }
@@ -118,38 +126,139 @@ impl Agent {
                     let a = stack.pop();
                     stack.push(if b == 0 { 0 } else { a.wrapping_rem(b) });
                 }
-                op::LOAD_BASE => {
-                    // TODO: Memory Interaction (Load)
+                op::LOAD_BASE..=op::LOAD_END => {
+                    let bank_idx = (instruction - op::LOAD_BASE) as usize;
+                    let addr = self.genome[pc] as usize;
+                    pc += 1;
+
+                    let value = if bank_idx < 6 {
+                        self.private_banks.0[bank_idx][addr]
+                    } else {
+                        _shared.0[bank_idx - 6][addr]
+                    };
+                    stack.push(value);
                 }
-                op::LOAD_IND_BASE => {
-                    // TODO: Memory Interaction (Load)
+                op::LOAD_IND_BASE..=op::LOAD_IND_END => {
+                    let bank_idx = (instruction - op::LOAD_IND_BASE) as usize;
+                    let addr = stack.pop() as usize;
+
+                    let value = if bank_idx < 6 {
+                        self.private_banks.0[bank_idx][addr]
+                    } else {
+                        _shared.0[bank_idx - 6][addr]
+                    };
+                    stack.push(value);
                 }
-                op::STORE_BASE => {
-                    // TODO: Memory Interaction (Store)
+                op::STORE_BASE..=op::STORE_END => {
+                    let bank_idx = (instruction - op::STORE_BASE) as usize;
+                    let addr = self.genome[pc] as usize;
+                    pc += 1;
+                    let value = stack.pop();
+
+                    if bank_idx < 6 {
+                        self.private_banks.0[bank_idx][addr] = value;
+                    } else {
+                        _shared.0[bank_idx - 6][addr] = value;
+                    }
                 }
-                op::STORE_IND_BASE => {
-                    // TODO: Memory Interaction (Store)
+                op::STORE_IND_BASE..=op::STORE_IND_END => {
+                    let bank_idx = (instruction - op::STORE_IND_BASE) as usize;
+                    let addr = stack.pop() as usize;
+                    let value = stack.pop();
+
+                    if bank_idx < 6 {
+                        self.private_banks.0[bank_idx][addr] = value;
+                    } else {
+                        _shared.0[bank_idx - 6][addr] = value;
+                    }
                 }
-                op::LOADC_BASE => {
-                    // TODO: Memory Interaction (Copy chunks)
+                op::LOADC_BASE..=op::LOADC_END => {
+                    let bank_idx = (instruction - op::LOADC_BASE) as usize;
+                    let addr = self.genome[pc] as usize;
+                    pc += 1;
+                    let count = self.genome[pc] as usize;
+                    pc += 1;
+
+                    if bank_idx < 6 {
+                        for i in 0..count {
+                            stack.push(self.private_banks.0[bank_idx][(addr + i) % 256]);
+                        }
+                    } else {
+                        for i in 0..count {
+                            stack.push(_shared.0[bank_idx - 6][(addr + i) % 256]);
+                        }
+                    }
                 }
-                op::LOADC_IND_BASE => {
-                    // TODO: Memory Interaction (Copy chunks)
+                op::LOADC_IND_BASE..=op::LOADC_IND_END => {
+                    let bank_idx = (instruction - op::LOADC_IND_BASE) as usize;
+                    let addr = stack.pop() as usize;
+                    let count = stack.pop() as usize;
+
+                    if bank_idx < 6 {
+                        for i in 0..count {
+                            stack.push(self.private_banks.0[bank_idx][(addr + i) % 256]);
+                        }
+                    } else {
+                        for i in 0..count {
+                            stack.push(_shared.0[bank_idx - 6][(addr + i) % 256]);
+                        }
+                    }
                 }
-                op::STOREC_BASE => {
-                    // TODO: Memory Interaction (Copy chunks)
+                op::STOREC_BASE..=op::STOREC_END => {
+                    let bank_idx = (instruction - op::STOREC_BASE) as usize;
+                    let addr = self.genome[pc] as usize;
+                    pc += 1;
+                    let count = self.genome[pc] as usize;
+                    pc += 1;
+
+                    if bank_idx < 6 {
+                        for i in 0..count {
+                            let value = stack.pop();
+                            self.private_banks.0[bank_idx][(addr + i) % 256] = value;
+                        }
+                    } else {
+                        for i in 0..count {
+                            let value = stack.pop();
+                            _shared.0[bank_idx - 6][(addr + i) % 256] = value;
+                        }
+                    }
                 }
-                op::STOREC_IND_BASE => {
-                    // TODO: Memory Interaction (Copy chunks)
+                op::STOREC_IND_BASE..=op::STOREC_IND_END => {
+                    let bank_idx = (instruction - op::STOREC_IND_BASE) as usize;
+                    let addr = stack.pop() as usize;
+                    let count = stack.pop() as usize;
+
+                    if bank_idx < 6 {
+                        for i in 0..count {
+                            let value = stack.pop();
+                            self.private_banks.0[bank_idx][(addr + i) % 256] = value;
+                        }
+                    } else {
+                        for i in 0..count {
+                            let value = stack.pop();
+                            _shared.0[bank_idx - 6][(addr + i) % 256] = value;
+                        }
+                    }
                 }
                 op::JUMP => {
-                    // TODO: Control flow jump
+                    let offset = self.genome[pc] as i8;
+                    pc = (pc as i32 + 1 + offset as i32).max(0) as usize;
                 }
                 op::JUMP_IF => {
-                    // TODO: Control flow jump if
+                    let offset = self.genome[pc] as i8;
+                    pc += 1;
+                    let cond = stack.pop();
+                    if cond != 0 {
+                        pc = (pc as i32 + offset as i32).max(0) as usize;
+                    }
                 }
                 op::JUMP_IF_NOT => {
-                    // TODO: Control flow jump if not
+                    let offset = self.genome[pc] as i8;
+                    pc += 1;
+                    let cond = stack.pop();
+                    if cond == 0 {
+                        pc = (pc as i32 + offset as i32).max(0) as usize;
+                    }
                 }
                 op::EQ => {
                     let b = stack.pop();
@@ -185,16 +294,22 @@ impl Agent {
                     stack.push(if cond != 0 { val_a } else { val_b });
                 }
                 op::GET_SP => {
-                    // TODO: Pushes the Stack Pointer to stack
+                    stack.push(stack.len() as u8);
                 }
                 op::GET_PC => {
-                    // TODO: Pushes the Program Counter to stack
+                    stack.push(pc as u8);
                 }
                 op::GET_ENERGY => {
-                    // TODO: Pushes the current Energy to stack
+                    stack.push(self.energy.0 as u8);
                 }
                 op::RNG => {
-                    // TODO: Pushes a random byte
+                    stack.push(
+                        (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_nanos()
+                            ^ nbr_executed as u128) as u8,
+                    );
                 }
                 _ => {}
             }
@@ -203,7 +318,11 @@ impl Agent {
             nbr_executed += 1;
         }
 
-        self
+        if pc >= self.genome.len() {
+            ExecutionResult::TimedOut
+        } else {
+            ExecutionResult::Died
+        }
     }
 
     pub fn collect_output(&self) -> Vec<u8> {
