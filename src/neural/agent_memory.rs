@@ -1,4 +1,13 @@
-pub struct PrivateBanks([[u8; 256]; 6]);
+use serde::{Deserialize, Serialize};
+use serde_with::{Bytes, serde_as};
+
+#[serde_as]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+pub struct PrivateBanks(#[serde_as(as = "[Bytes; 6]")] pub(crate) [[u8; 256]; 6]);
+
+#[serde_as]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+pub struct SharedBanks(#[serde_as(as = "[Bytes; 2]")] pub(crate) [[u8; 256]; 2]);
 
 impl PrivateBanks {
     pub fn write_input(&mut self, data: &[u8]) {
@@ -25,4 +34,20 @@ impl PrivateBanks {
     }
 }
 
-pub struct SharedBanks([[u8; 256]; 2]);
+impl Default for PrivateBanks {
+    fn default() -> Self {
+        PrivateBanks([[0u8; 256]; 6])
+    }
+}
+
+impl SharedBanks {
+    pub fn raw_mut(&mut self, bank_idx: usize) -> &mut [u8; 256] {
+        &mut self.0[bank_idx]
+    }
+}
+
+impl Default for SharedBanks {
+    fn default() -> Self {
+        SharedBanks([[0u8; 256]; 2])
+    }
+}
