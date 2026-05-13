@@ -45,6 +45,17 @@ impl Agent {
 
         let mut stack = ByteStack::new();
 
+        let bank_ptrs: [*const [u8; 256]; 8] = [
+            &self.private_banks.0[0],
+            &self.private_banks.0[1],
+            &self.private_banks.0[2],
+            &self.private_banks.0[3],
+            &self.private_banks.0[4],
+            &self.private_banks.0[5],
+            &_shared.0[0],
+            &_shared.0[1],
+        ];
+
         while nbr_executed < max_steps && pc < self.genome.len() && self.energy.0 > 0.0 {
             let instruction = self.genome[pc];
             pc += 1;
@@ -131,22 +142,14 @@ impl Agent {
                     let addr = self.genome[pc] as usize;
                     pc += 1;
 
-                    let value = if bank_idx < 6 {
-                        self.private_banks.0[bank_idx][addr]
-                    } else {
-                        _shared.0[bank_idx - 6][addr]
-                    };
+                    let value = unsafe { (*bank_ptrs[bank_idx])[addr & 0xFF] };
                     stack.push(value);
                 }
                 op::LOAD_IND_BASE..=op::LOAD_IND_END => {
                     let bank_idx = (instruction - op::LOAD_IND_BASE) as usize;
                     let addr = stack.pop() as usize;
 
-                    let value = if bank_idx < 6 {
-                        self.private_banks.0[bank_idx][addr]
-                    } else {
-                        _shared.0[bank_idx - 6][addr]
-                    };
+                    let value = unsafe { (*bank_ptrs[bank_idx])[addr & 0xFF] };
                     stack.push(value);
                 }
                 op::STORE_BASE..=op::STORE_END => {
@@ -155,22 +158,14 @@ impl Agent {
                     pc += 1;
                     let value = stack.pop();
 
-                    if bank_idx < 6 {
-                        self.private_banks.0[bank_idx][addr] = value;
-                    } else {
-                        _shared.0[bank_idx - 6][addr] = value;
-                    }
+                    unsafe { *(bank_ptrs[bank_idx] as *mut u8).add(addr & 0xFF) = value };
                 }
                 op::STORE_IND_BASE..=op::STORE_IND_END => {
                     let bank_idx = (instruction - op::STORE_IND_BASE) as usize;
                     let addr = stack.pop() as usize;
                     let value = stack.pop();
 
-                    if bank_idx < 6 {
-                        self.private_banks.0[bank_idx][addr] = value;
-                    } else {
-                        _shared.0[bank_idx - 6][addr] = value;
-                    }
+                    unsafe { *(bank_ptrs[bank_idx] as *mut u8).add(addr & 0xFF) = value };
                 }
                 op::LOADC_BASE..=op::LOADC_END => {
                     let bank_idx = (instruction - op::LOADC_BASE) as usize;
@@ -179,14 +174,8 @@ impl Agent {
                     let count = self.genome[pc] as usize;
                     pc += 1;
 
-                    if bank_idx < 6 {
-                        for i in 0..count {
-                            stack.push(self.private_banks.0[bank_idx][(addr + i) % 256]);
-                        }
-                    } else {
-                        for i in 0..count {
-                            stack.push(_shared.0[bank_idx - 6][(addr + i) % 256]);
-                        }
+                    for i in 0..count {
+                        stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                     }
                 }
                 op::LOADC_IND_BASE..=op::LOADC_IND_END => {
@@ -194,14 +183,8 @@ impl Agent {
                     let addr = stack.pop() as usize;
                     let count = stack.pop() as usize;
 
-                    if bank_idx < 6 {
-                        for i in 0..count {
-                            stack.push(self.private_banks.0[bank_idx][(addr + i) % 256]);
-                        }
-                    } else {
-                        for i in 0..count {
-                            stack.push(_shared.0[bank_idx - 6][(addr + i) % 256]);
-                        }
+                    for i in 0..count {
+                        stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                     }
                 }
                 op::STOREC_BASE..=op::STOREC_END => {
@@ -211,16 +194,9 @@ impl Agent {
                     let count = self.genome[pc] as usize;
                     pc += 1;
 
-                    if bank_idx < 6 {
-                        for i in 0..count {
-                            let value = stack.pop();
-                            self.private_banks.0[bank_idx][(addr + i) % 256] = value;
-                        }
-                    } else {
-                        for i in 0..count {
-                            let value = stack.pop();
-                            _shared.0[bank_idx - 6][(addr + i) % 256] = value;
-                        }
+                    for i in 0..count {
+                        let value = stack.pop();
+                        unsafe { *(bank_ptrs[bank_idx] as *mut u8).add((addr + i) & 0xFF) = value };
                     }
                 }
                 op::STOREC_IND_BASE..=op::STOREC_IND_END => {
@@ -228,16 +204,9 @@ impl Agent {
                     let addr = stack.pop() as usize;
                     let count = stack.pop() as usize;
 
-                    if bank_idx < 6 {
-                        for i in 0..count {
-                            let value = stack.pop();
-                            self.private_banks.0[bank_idx][(addr + i) % 256] = value;
-                        }
-                    } else {
-                        for i in 0..count {
-                            let value = stack.pop();
-                            _shared.0[bank_idx - 6][(addr + i) % 256] = value;
-                        }
+                    for i in 0..count {
+                        let value = stack.pop();
+                        unsafe { *(bank_ptrs[bank_idx] as *mut u8).add((addr + i) & 0xFF) = value };
                     }
                 }
                 op::JUMP => {
