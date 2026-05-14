@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    neural::{Agent, AgentId, SharedBanks},
+    neural::{Agent, AgentId, AgentSpawner, SharedBanks},
     sim::engine::SimulationEvent,
     sim::runner::AgentSession,
     sim::storage::CommunityId,
@@ -23,8 +23,32 @@ impl Multiverse {
         }
     }
 
+    /// Create a randomly initialized multiverse with X communities and N agents per community.
+    pub fn new_random(
+        num_communities: usize,
+        agents_per_community: usize,
+        spawn_energy: f32,
+    ) -> Self {
+        let mut multiverse = Self::new();
+        let spawner = AgentSpawner { spawn_energy };
+
+        for i in 0..num_communities {
+            let mut community = Community::new();
+            for _ in 0..agents_per_community {
+                community.add_agent(spawner.new_random());
+            }
+            multiverse.add_community(CommunityId(i), community);
+        }
+
+        multiverse
+    }
+
     pub fn add_community(&mut self, id: CommunityId, community: Community) {
         self.spaces.insert(id, community);
+    }
+
+    pub fn survivor_count(&self) -> usize {
+        self.spaces.values().map(|c| c.agents.len()).sum()
     }
 
     /// Obtain a session for a specific agent.
@@ -98,6 +122,12 @@ impl Multiverse {
                     }
                 }
             }
+        }
+    }
+
+    pub fn remove_agent(&mut self, comm_id: CommunityId, agent_id: AgentId) {
+        if let Some(community) = self.spaces.get_mut(&comm_id) {
+            community.agents.remove(&agent_id);
         }
     }
 

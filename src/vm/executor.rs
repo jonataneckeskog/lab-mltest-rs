@@ -1,5 +1,6 @@
 use crate::vm::{
     isa::op,
+    op::SPAWN_CHILD,
     stack::ByteStack,
     traits::{VmContext, VmMemory},
 };
@@ -291,14 +292,8 @@ impl<'a> AgentExecutor<'a> {
                             reason: TerminationReason::Died,
                         };
                     }
-                    op::LEAVE_COMMUNITY => {
+                    op::LEAVE_COMMUNITY | SPAWN_CHILD => {
                         syst_call!(ctx, stack, instruction);
-                    }
-                    op::SPAWN_CHILD => {
-                        let spent_energy = stack.peek() as f32 * 0.39215686;
-                        if spent_energy <= memory.get_energy() {
-                            syst_call!(ctx, stack, instruction);
-                        }
                     }
                     op::GET_SP => {
                         stack.push(stack.len() as u8);
@@ -333,13 +328,18 @@ impl<'a> AgentExecutor<'a> {
             nbr_executed += 1;
         }
 
-        if pc >= memory.genome_len() {
+        if nbr_executed >= max_steps {
             ExecutionSummary {
                 reason: TerminationReason::TimedOut,
             }
-        } else {
+        } else if memory.get_energy() <= 0.0 {
             ExecutionSummary {
                 reason: TerminationReason::Died,
+            }
+        } else {
+            // Reached end of genome
+            ExecutionSummary {
+                reason: TerminationReason::Halted { confidence: 0 },
             }
         }
     }

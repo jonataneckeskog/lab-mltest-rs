@@ -1,9 +1,11 @@
 use crate::{
     neural::{Agent, AgentId, AgentVmMemory, SharedBanks},
-    sim::engine::{SimulationContext, SimulationEvent},
-    sim::storage::CommunityId,
-    sim::task::{MultiStepTask, SingleStepTask},
-    vm::AgentExecutor,
+    sim::{
+        engine::{SimulationContext, SimulationEvent},
+        storage::CommunityId,
+        task::{MultiStepTask, SingleStepTask},
+    },
+    vm::{AgentExecutor, TerminationReason},
 };
 
 /// A Session provides a direct interface to manipulate and run a single agent
@@ -47,25 +49,36 @@ impl<'a> SimulationRunner<'a> {
         total_energy: f32,
         max_steps: usize,
     ) {
-        let (scores, all_events) = self.run_population(&mut multiverse.spaces, task, max_steps);
+        let (scores, all_events, dead_agents) =
+            self.run_population(&mut multiverse.spaces, task, max_steps);
 
-        // 1. Distribute Energy
+        // 1. Kill agents that died during execution
+        for (comm_id, agent_id) in dead_agents {
+            multiverse.remove_agent(comm_id, agent_id);
+        }
+
+        // 2. Distribute Energy (Additive rewards)
         self.distribute_energy_by_scores(&mut multiverse.spaces, scores, total_energy);
 
-        // 2. Resolve Events
+        // 3. Resolve Events (Spawn/Migration)
         multiverse.resolve_events(all_events);
     }
 
     /// Run a single step task across an entire population.
-    /// Returns a list of (CommunityId, AgentId, PerformanceScore) and all triggered events.
+    /// Returns scores, triggered events, and a list of agents that explicitly died.
     pub fn run_population(
         &self,
         spaces: &mut std::collections::HashMap<CommunityId, crate::sim::multiverse::Community>,
         task: &dyn SingleStepTask,
         max_steps: usize,
-    ) -> (Vec<(CommunityId, AgentId, f32)>, Vec<SimulationEvent>) {
+    ) -> (
+        Vec<(CommunityId, AgentId, f32)>,
+        Vec<SimulationEvent>,
+        Vec<(CommunityId, AgentId)>,
+    ) {
         let mut all_events = Vec::new();
         let mut scores = Vec::new();
+        let mut dead_agents = Vec::new();
         let input = task.input_data();
 
         for (comm_id, community) in spaces {
@@ -73,20 +86,28 @@ impl<'a> SimulationRunner<'a> {
                 agent.load_input(input);
 
                 let mut ctx = SimulationContext::new(*agent_id, *comm_id);
-                {
+                let summary = {
                     let mut memory = AgentVmMemory::new(agent, &mut community.shared_comms);
-                    self.executor.run(&mut memory, &mut ctx, max_steps);
+                    self.executor.run(&mut memory, &mut ctx, max_steps)
+                };
+
+                match summary.reason {
+                    TerminationReason::Died => {
+                        dead_agents.push((*comm_id, *agent_id));
+                        continue; // Skip scoring and event processing for this agent
+                    }
+                    _ => {
+                        let output = agent.collect_output();
+                        let score = task.evaluate(&output).max(0.0);
+
+                        scores.push((*comm_id, *agent_id, score));
+                        all_events.extend(ctx.events);
+                    }
                 }
-
-                let output = agent.collect_output();
-                let score = task.evaluate(&output).max(0.0);
-
-                scores.push((*comm_id, *agent_id, score));
-                all_events.extend(ctx.events);
             }
         }
 
-        (scores, all_events)
+        (scores, all_events, dead_agents)
     }
 
     /// Run a multi-step task for a specific agent session.
@@ -98,21 +119,28 @@ impl<'a> SimulationRunner<'a> {
         step_energy_budget: f32,
         max_steps_per_tick: usize,
     ) {
-        while !task.is_finished() && session.agent.energy.0 > 0.0 {
+        while !task.is_finished() {
             session.agent.load_input(task.next_input());
 
             let mut ctx = SimulationContext::new(AgentId(0), session.community_id);
-            {
+            let summary = {
                 let mut memory = AgentVmMemory::new(session.agent, session.shared_banks);
-                self.executor.run(&mut memory, &mut ctx, max_steps_per_tick);
-            }
+                self.executor.run(&mut memory, &mut ctx, max_steps_per_tick)
+            };
             session.events.extend(ctx.events);
 
-            let output = session.agent.collect_output();
-            let performance = task.step(&output).max(0.0);
-
-            // Immediate reward injection
-            session.agent.energy.0 += performance * step_energy_budget;
+            match summary.reason {
+                TerminationReason::Died => {
+                    session.agent.set_energy(0.0);
+                    return; // Stop immediately on death
+                }
+                _ => {
+                    let output = session.agent.collect_output();
+                    let performance = task.step(&output).max(0.0);
+                    // Immediate reward injection
+                    session.agent.energy.0 += performance * step_energy_budget;
+                }
+            }
         }
     }
 
@@ -132,7 +160,7 @@ impl<'a> SimulationRunner<'a> {
                     .get_mut(&comm_id)
                     .and_then(|c| c.agents.get_mut(&agent_id))
                 {
-                    agent.energy.0 = reward;
+                    agent.energy.0 += reward; // Additive
                 }
             }
         } else if !scores.is_empty() {
@@ -142,7 +170,7 @@ impl<'a> SimulationRunner<'a> {
                     .get_mut(&comm_id)
                     .and_then(|c| c.agents.get_mut(&agent_id))
                 {
-                    agent.energy.0 = share;
+                    agent.energy.0 += share; // Additive
                 }
             }
         }

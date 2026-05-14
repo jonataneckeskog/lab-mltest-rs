@@ -16,7 +16,7 @@ impl Default for Agent {
             base_genome: Genome::default(),
             genome: Vec::with_capacity(32),
             private_banks: PrivateBanks::default(),
-            energy: OrderedFloat(100.0),
+            energy: OrderedFloat(0.0),
         }
     }
 }
@@ -28,6 +28,22 @@ impl Agent {
 
     pub fn collect_output(&self) -> Vec<u8> {
         self.private_banks.read_output()
+    }
+
+    pub fn get_energy(&self) -> f32 {
+        self.energy.0
+    }
+
+    pub fn set_energy(&mut self, val: f32) {
+        self.energy.0 = val;
+    }
+
+    pub fn set_genome(&mut self, genome: Vec<u8>) {
+        self.genome = genome;
+    }
+
+    pub fn get_genome(&self) -> &[u8] {
+        &self.genome
     }
 }
 
