@@ -1,7 +1,6 @@
 use lab_mltest::evolution::hooks::basics::{CheckpointHook, PrintStatsHook};
-use lab_mltest::evolution::{EvolutionConfig, EvolutionHook};
+use lab_mltest::evolution::{EvolutionConfig, EvolutionHook, create_pluggable_engine};
 use lab_mltest::tasks::constant::ConstantTask;
-use lab_mltest::templates::basic::create_pluggable_engine;
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
