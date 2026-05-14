@@ -5,6 +5,29 @@ use crate::sim::storage::CommunityId;
 pub struct SimulationContext {
     pub agent_id: AgentId,
     pub community_id: CommunityId,
+    pub events: Vec<SimulationEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimulationEvent {
+    LeaveCommunity {
+        agent_id: AgentId,
+        target_community_id: CommunityId,
+    },
+    SpawnChild {
+        parent_id: AgentId,
+        energy: f32,
+    },
+}
+
+impl SimulationContext {
+    pub fn new(agent_id: AgentId, community_id: CommunityId) -> Self {
+        Self {
+            agent_id,
+            community_id,
+            events: Vec::new(),
+        }
+    }
 }
 
 impl VmContext for SimulationContext {
@@ -28,17 +51,66 @@ impl VmContext for SimulationContext {
     fn syscall(&mut self, opcode: u8, stack: &mut ByteStack) -> bool {
         match opcode {
             op::LEAVE_COMMUNITY => {
-                let _community_id = stack.pop();
-                // TODO: Perform migration immediately (requires access to Multiverse)
+                let target_id = stack.pop();
+                self.events.push(SimulationEvent::LeaveCommunity {
+                    agent_id: self.agent_id,
+                    target_community_id: CommunityId(target_id as usize),
+                });
                 true
             }
             op::SPAWN_CHILD => {
                 let val_u8 = stack.pop();
-                let _energy = (val_u8 as f32) * 0.39215686; // Scale 0-255 to 0-100
-                // TODO: Spawn child immediately (requires access to Multiverse and parent genome)
+                let energy = (val_u8 as f32) * 0.39215686; // Scale 0-255 to 0-100
+                self.events.push(SimulationEvent::SpawnChild {
+                    parent_id: self.agent_id,
+                    energy,
+                });
                 true
             }
             _ => false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vm::ByteStack;
+    use crate::vm::isa::op;
+
+    #[test]
+    fn test_leave_community_syscall() {
+        let mut ctx = SimulationContext::new(AgentId(10), CommunityId(1));
+        let mut stack = ByteStack::new();
+        stack.push(5); // Target community ID
+
+        let result = ctx.syscall(op::LEAVE_COMMUNITY, &mut stack);
+
+        assert!(result);
+        assert_eq!(ctx.events.len(), 1);
+        if let SimulationEvent::LeaveCommunity { agent_id, target_community_id } = &ctx.events[0] {
+            assert_eq!(agent_id.0, 10);
+            assert_eq!(target_community_id.0, 5);
+        } else {
+            panic!("Expected LeaveCommunity event");
+        }
+    }
+
+    #[test]
+    fn test_spawn_child_syscall() {
+        let mut ctx = SimulationContext::new(AgentId(10), CommunityId(1));
+        let mut stack = ByteStack::new();
+        stack.push(100); // Energy value (will be scaled)
+
+        let result = ctx.syscall(op::SPAWN_CHILD, &mut stack);
+
+        assert!(result);
+        assert_eq!(ctx.events.len(), 1);
+        if let SimulationEvent::SpawnChild { parent_id, energy } = &ctx.events[0] {
+            assert_eq!(parent_id.0, 10);
+            assert!((*energy - (100.0 * 0.39215686)).abs() < 0.0001);
+        } else {
+            panic!("Expected SpawnChild event");
         }
     }
 }
