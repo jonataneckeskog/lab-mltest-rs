@@ -5,6 +5,7 @@ use crate::neural::{
 };
 use crate::vm::traits::VmMemory;
 use ordered_float::OrderedFloat;
+use rand::RngExt;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct Agent {
@@ -12,7 +13,7 @@ pub struct Agent {
     pub(crate) genome: Vec<u8>,
     pub(crate) private_banks: PrivateBanks,
     pub(crate) energy: OrderedFloat<f32>,
-    pub age: u64,
+    pub(crate) age: u64,
 }
 
 impl Default for Agent {
@@ -62,6 +63,42 @@ impl Agent {
 
     pub fn get_genome(&self) -> &[u8] {
         &self.genome
+    }
+
+    pub fn mutate(&mut self, rng: &mut impl rand::Rng) {
+        let settings = self.get_mutation_settings();
+        if settings.cosmic_ray_rate == 0 {
+            return;
+        }
+
+        // Probability of a bit flip per bit.
+        // 255 = ~1% chance per bit (very high)
+        let prob = (settings.cosmic_ray_rate as f64) / (255.0 * 100.0);
+        let total_bits = self.genome.len() * 8;
+
+        let log_q = (1.0 - prob).ln();
+        let mut bit_idx = 0;
+
+        while bit_idx < total_bits {
+            let u: f64 = rng.random();
+
+            let u_bits = u.to_bits();
+            let exponent = ((u_bits >> 52) & 0x7FF) as i32 - 1023;
+            let mantissa_fraction = (u_bits & 0xF_FFFF_FFFF_FFFF) as f64 / 4503599627370496.0;
+
+            let approx_ln_u = (exponent as f64 * 0.69314718) + mantissa_fraction;
+
+            let jump = (approx_ln_u / log_q).floor() as usize;
+            bit_idx += jump + 1;
+
+            if bit_idx < total_bits {
+                let byte_idx = bit_idx / 8;
+                let bit_in_byte = bit_idx % 8;
+                if let Some(byte) = self.genome.get_mut(byte_idx) {
+                    *byte ^= 1 << bit_in_byte;
+                }
+            }
+        }
     }
 }
 

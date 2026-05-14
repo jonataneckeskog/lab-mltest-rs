@@ -1,8 +1,8 @@
 use crate::{
-    neural::{Agent, AgentId, AgentSpawner, SharedBanks},
+    core::{AgentId, CommunityId},
+    neural::{Agent, AgentSpawner, SharedBanks},
     sim::engine::SimulationEvent,
     sim::runner::AgentSession,
-    sim::storage::CommunityId,
 };
 use std::collections::HashMap;
 
@@ -201,6 +201,14 @@ impl Multiverse {
         self.add_agent_to_community(to_id, agent);
 
         Ok(())
+    }
+
+    pub fn mutate_all(&mut self, rng: &mut impl rand::Rng) {
+        for community in self.spaces.values_mut() {
+            for agent in community.agents.values_mut() {
+                agent.mutate(rng);
+            }
+        }
     }
 }
 

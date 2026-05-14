@@ -1,13 +1,9 @@
 use crate::{
-    core::{MultiStepTask, SingleStepTask},
-    neural::{Agent, AgentId, AgentVmMemory, SharedBanks},
-    sim::{
-        engine::{SimulationContext, SimulationEvent},
-        storage::CommunityId,
-    },
+    core::{AgentId, CommunityId, MultiStepTask, SingleStepTask},
+    neural::{Agent, AgentVmMemory, SharedBanks},
+    sim::engine::{SimulationContext, SimulationEvent},
     vm::{AgentExecutor, TerminationReason},
 };
-use rand::RngExt;
 
 /// A Session provides a direct interface to manipulate and run a single agent
 /// within the context of its community and the multiverse.
@@ -69,51 +65,6 @@ impl<'a> SimulationRunner<'a> {
         while multiverse.population < min_population {
             let new_agent = refill_fn();
             multiverse.add_agent_to_random_community(new_agent);
-        }
-    }
-
-    pub fn mutate(
-        &self,
-        rng: &mut impl rand::Rng,
-        multiverse: &mut crate::sim::multiverse::Multiverse,
-    ) {
-        for community in multiverse.spaces.values_mut() {
-            for agent in community.agents.values_mut() {
-                let settings = agent.get_mutation_settings();
-                if settings.cosmic_ray_rate == 0 {
-                    continue;
-                }
-
-                // Probability of a bit flip per bit.
-                // 255 = ~1% chance per bit (very high)
-                let prob = (settings.cosmic_ray_rate as f64) / (255.0 * 100.0);
-                let total_bits = agent.genome.len() * 8;
-
-                let log_q = (1.0 - prob).ln();
-                let mut bit_idx = 0;
-
-                while bit_idx < total_bits {
-                    let u: f64 = rng.random();
-
-                    let u_bits = u.to_bits();
-                    let exponent = ((u_bits >> 52) & 0x7FF) as i32 - 1023;
-                    let mantissa_fraction =
-                        (u_bits & 0xF_FFFF_FFFF_FFFF) as f64 / 4503599627370496.0;
-
-                    let approx_ln_u = (exponent as f64 * 0.69314718) + mantissa_fraction;
-
-                    let jump = (approx_ln_u / log_q).floor() as usize;
-                    bit_idx += jump + 1;
-
-                    if bit_idx < total_bits {
-                        let byte_idx = bit_idx / 8;
-                        let bit_in_byte = bit_idx % 8;
-                        if let Some(byte) = agent.genome.get_mut(byte_idx) {
-                            *byte ^= 1 << bit_in_byte;
-                        }
-                    }
-                }
-            }
         }
     }
 

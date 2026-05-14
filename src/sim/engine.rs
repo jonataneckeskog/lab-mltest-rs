@@ -1,5 +1,4 @@
-use crate::neural::AgentId;
-use crate::sim::storage::CommunityId;
+use crate::core::{AgentId, CommunityId};
 use crate::vm::{ByteStack, VmContext, op};
 
 pub struct SimulationContext {

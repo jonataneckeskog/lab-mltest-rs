@@ -74,7 +74,7 @@ impl<'a> EvolutionEngine<'a> {
                 || self.spawner.new_random(rng),
             );
 
-            runner.mutate(rng, &mut self.multiverse);
+            self.multiverse.mutate_all(rng);
 
             let should_continue = hook.on_generation_complete(generation, &self.multiverse);
 

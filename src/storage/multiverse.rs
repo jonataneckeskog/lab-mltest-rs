@@ -1,11 +1,9 @@
+use crate::core::{AgentId, CommunityId};
+use crate::neural::{Agent, SharedBanks};
+use crate::sim::multiverse::{Community, Multiverse};
+use crate::storage::agent::{AgentManifest, BankManifest};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-
-use super::multiverse::{Community, Multiverse};
-use crate::neural::{AgentManifest, BankManifest, SharedBanks};
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CommunityId(pub usize);
 
 #[derive(Serialize, Deserialize)]
 pub struct CommunityManifest {
@@ -25,7 +23,7 @@ impl Community {
         let agents: Vec<AgentManifest> = self
             .agents
             .iter()
-            .map(|(id, agent)| agent.save(*id, folder))
+            .map(|(id, agent): (&AgentId, &Agent)| agent.save(*id, folder))
             .collect::<std::io::Result<Vec<_>>>()?;
 
         let shared_banks = self.shared_comms.save(id.0, folder)?;
@@ -40,7 +38,7 @@ impl Community {
 
 impl CommunityManifest {
     pub fn load(&self, folder: &Path) -> anyhow::Result<Community> {
-        let agents: HashMap<crate::neural::AgentId, crate::neural::Agent> = self
+        let agents: HashMap<crate::core::AgentId, crate::neural::Agent> = self
             .agents
             .iter()
             .map(|agent_manifest| {
@@ -84,7 +82,7 @@ impl Multiverse {
         let communities = self
             .spaces
             .iter()
-            .map(|(id, community)| {
+            .map(|(id, community): (&CommunityId, &Community)| {
                 community
                     .save(*id, folder)
                     .expect("Failed to save community")
@@ -114,7 +112,8 @@ impl MultiverseManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neural::{Agent, AgentId, SharedBanks};
+    use crate::core::{AgentId, CommunityId};
+    use crate::neural::{Agent, SharedBanks};
     use ordered_float::OrderedFloat;
     use tempfile::tempdir;
 

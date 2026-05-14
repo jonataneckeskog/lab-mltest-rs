@@ -3,11 +3,10 @@ pub mod genome;
 pub mod memory;
 pub mod config;
 pub mod spawner;
-pub mod storage;
 
 pub use agent::{Agent, AgentVmMemory};
 pub use genome::Genome;
 pub use memory::SharedBanks;
 pub use config::OP_COSTS;
 pub use spawner::AgentSpawner;
-pub use storage::{AgentId, AgentManifest, BankManifest};
+pub use crate::core::AgentId;

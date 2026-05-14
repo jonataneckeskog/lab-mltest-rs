@@ -1,15 +1,12 @@
+use crate::core::AgentId;
 use crate::neural::{
     agent::Agent,
     genome::Genome,
     memory::{Bank, BankMetadata},
 };
-
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AgentId(pub usize);
 
 #[derive(Serialize, Deserialize)]
 pub struct AgentManifest {
