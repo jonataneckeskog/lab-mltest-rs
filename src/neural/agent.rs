@@ -1,9 +1,11 @@
-use crate::neural::{
-    config::MutationSettings,
-    genome::Genome,
-    memory::{PrivateBanks, SharedBanks},
+use crate::{
+    neural::{
+        config::MutationSettings,
+        genome::Genome,
+        memory::{PrivateBanks, SharedBanks},
+    },
+    vm::VmMemory,
 };
-use crate::vm::traits::VmMemory;
 use ordered_float::OrderedFloat;
 use rand::RngExt;
 

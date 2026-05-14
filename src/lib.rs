@@ -5,4 +5,4 @@ pub mod neural;
 pub mod sim;
 pub mod storage;
 pub mod tasks;
-pub mod vm;
+mod vm;
