@@ -1,6 +1,7 @@
 use crate::neural::{
-    agent::{Agent, Genome},
-    agent_memory::{Bank, BankMetadata},
+    agent::Agent,
+    genome::Genome,
+    memory::{Bank, BankMetadata},
 };
 
 use ordered_float::OrderedFloat;
@@ -31,7 +32,6 @@ where
 {
     pub fn save(&self, id: usize, folder: &Path) -> std::io::Result<BankManifest> {
         let filename = format!("{}_{}.bin", Self::PREFIX, id);
-        // ... identical serialization logic as above ...
         let path = folder.join(&filename);
         let bytes = bincode::serialize(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
@@ -102,7 +102,7 @@ impl AgentManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neural::agent_memory::{PrivateBanks, SharedBanks};
+    use crate::neural::memory::{PrivateBanks, SharedBanks};
     use tempfile::tempdir;
 
     // Helper to create a basic agent

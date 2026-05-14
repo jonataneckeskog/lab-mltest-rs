@@ -1,4 +1,4 @@
-use crate::neural::opcode::op;
+use crate::vm::op;
 
 macro_rules! define_costs {
     (default: $default:expr, { $($op:expr => $cost:expr),* $(,)? }) => {{

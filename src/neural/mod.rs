@@ -1,15 +1,13 @@
-mod agent;
-mod agent_memory;
-mod byte_stack;
-mod config;
-mod execution;
-mod opcode;
-mod spawner;
-mod storage;
+pub mod agent;
+pub mod genome;
+pub mod memory;
+pub mod config;
+pub mod spawner;
+pub mod storage;
 
-pub use agent::Agent;
-pub use agent_memory::SharedBanks;
+pub use agent::{Agent, AgentVmMemory};
+pub use genome::Genome;
+pub use memory::SharedBanks;
 pub use config::OP_COSTS;
-pub use execution::{AgentExecutor, ExecutionSummary, SysCall, TerminationReason};
 pub use spawner::AgentSpawner;
 pub use storage::{AgentId, AgentManifest, BankManifest};

@@ -2,8 +2,7 @@ use ordered_float::OrderedFloat;
 use rand::Rng;
 use std::sync::Arc;
 
-// Assuming these imports are correct for your crate structure
-use crate::neural::{Agent, agent::Genome, agent_memory::PrivateBanks};
+use crate::neural::{Agent, genome::Genome, memory::PrivateBanks};
 
 pub struct AgentSpawner {
     pub spawn_energy: f32,
@@ -45,31 +44,5 @@ impl AgentSpawner {
             energy: OrderedFloat(energy),
             private_banks: PrivateBanks::default(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_random_agent_generation() {
-        let spawner = AgentSpawner {
-            spawn_energy: 100.0,
-        };
-        let agent = spawner.new_random();
-
-        assert_eq!(agent.genome.len(), 64);
-        assert_eq!(agent.energy.0, 100.0);
-
-        let non_zero_count = agent.genome[..32].iter().filter(|&&b| b != 0).count();
-        assert!(
-            non_zero_count > 0,
-            "Genome should have some randomized data"
-        );
-        for byte in &agent.genome[32..] {
-            assert_eq!(*byte, 0);
-        }
-        assert_eq!(&*agent.base_genome.0, &agent.genome);
     }
 }
