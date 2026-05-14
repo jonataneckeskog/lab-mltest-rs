@@ -125,10 +125,13 @@ impl Multiverse {
         }
     }
 
-    pub fn remove_agent(&mut self, comm_id: CommunityId, agent_id: AgentId) {
-        if let Some(community) = self.spaces.get_mut(&comm_id) {
-            community.agents.remove(&agent_id);
+    pub fn remove_agent(&mut self, comm_id: CommunityId, agent_id: AgentId) -> Option<Agent> {
+        let comm = self.spaces.get_mut(&comm_id)?;
+        let agent = comm.agents.remove(&agent_id)?;
+        if comm.agents.is_empty() {
+            self.spaces.remove(&comm_id);
         }
+        Some(agent)
     }
 
     pub fn migrate_agent(
@@ -138,16 +141,12 @@ impl Multiverse {
         agent_id: AgentId,
     ) -> anyhow::Result<()> {
         let agent = self
-            .spaces
-            .get_mut(&from_id)
-            .ok_or_else(|| anyhow::anyhow!("Source community not found"))?
-            .agents
-            .remove(&agent_id)
+            .remove_agent(from_id, agent_id)
             .ok_or_else(|| anyhow::anyhow!("Agent not found in source community"))?;
 
         self.spaces
-            .get_mut(&to_id)
-            .ok_or_else(|| anyhow::anyhow!("Destination community not found"))?
+            .entry(to_id)
+            .or_insert_with(Community::new)
             .agents
             .insert(agent_id, agent);
 
@@ -247,8 +246,7 @@ mod tests {
         // Budget = 100.
         // a1 (score 10) -> 10/40 * 100 = 25
         // a2 (score 30) -> 30/40 * 100 = 75
-        let rng = &mut rand::rng();
-        runner.run_population_tick(rng, &mut multiverse, &MockTask, 100.0, 0);
+        runner.run_population_tick(&mut multiverse, &MockTask, 100.0, 0);
 
         let comm_ref = multiverse.spaces.get(&CommunityId(1)).unwrap();
 
