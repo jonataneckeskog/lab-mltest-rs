@@ -1,7 +1,6 @@
 use crate::neural::{Agent, SharedBanks, agent::Genome, byte_stack::ByteStack, opcode::op};
 
 pub struct AgentExecutor<'a> {
-    agent: &'a mut Agent,
     shared: &'a mut SharedBanks,
     op_costs: &'a [f32; 256],
 }
@@ -23,19 +22,11 @@ pub enum SysCall {
 }
 
 impl<'a> AgentExecutor<'a> {
-    pub fn new(
-        agent: &'a mut Agent,
-        shared: &'a mut SharedBanks,
-        op_costs: &'a [f32; 256],
-    ) -> Self {
-        Self {
-            agent,
-            shared,
-            op_costs,
-        }
+    pub fn new(shared: &'a mut SharedBanks, op_costs: &'a [f32; 256]) -> Self {
+        Self { shared, op_costs }
     }
 
-    pub fn run(&mut self, max_steps: usize) -> ExecutionSummary {
+    pub fn run(&mut self, agent: &'a mut Agent, max_steps: usize) -> ExecutionSummary {
         let mut pc = 0;
         let mut nbr_executed = 0;
         let mut stack = ByteStack::new();
@@ -43,22 +34,21 @@ impl<'a> AgentExecutor<'a> {
         let mut syscalls: Vec<SysCall> = Vec::new();
 
         let bank_ptrs: [*const [u8; 256]; 8] = [
-            &self.agent.private_banks.0[0],
-            &self.agent.private_banks.0[1],
-            &self.agent.private_banks.0[2],
-            &self.agent.private_banks.0[3],
-            &self.agent.private_banks.0[4],
-            &self.agent.private_banks.0[5],
+            &agent.private_banks.0[0],
+            &agent.private_banks.0[1],
+            &agent.private_banks.0[2],
+            &agent.private_banks.0[3],
+            &agent.private_banks.0[4],
+            &agent.private_banks.0[5],
             &self.shared.0[0],
             &self.shared.0[1],
         ];
 
-        let genome_mask = self.agent.genome.len().saturating_sub(1);
+        let genome_mask = agent.genome.len().saturating_sub(1);
         let wrap_pc = |pos: isize| -> usize { (pos as usize) & genome_mask };
 
-        while nbr_executed < max_steps && pc < self.agent.genome.len() && self.agent.energy.0 > 0.0
-        {
-            let mut instruction = self.agent.genome[pc];
+        while nbr_executed < max_steps && pc < agent.genome.len() && agent.energy.0 > 0.0 {
+            let mut instruction = agent.genome[pc];
             pc += 1;
 
             loop {
@@ -81,7 +71,7 @@ impl<'a> AgentExecutor<'a> {
                         stack.swap();
                     }
                     op::PUSH => {
-                        let value = self.agent.genome[pc];
+                        let value = agent.genome[pc];
                         stack.push(value);
                         pc += 1;
                     }
@@ -95,7 +85,7 @@ impl<'a> AgentExecutor<'a> {
                         stack.push(if cond != 0 { val_a } else { val_b });
                     }
                     op::EXEC_STACK => {
-                        self.agent.energy -= self.op_costs[op::EXEC_STACK as usize];
+                        agent.energy -= self.op_costs[op::EXEC_STACK as usize];
                         instruction = stack.pop();
                         continue;
                     }
@@ -155,7 +145,7 @@ impl<'a> AgentExecutor<'a> {
                     }
                     op::LOAD_BASE..=op::LOAD_END => {
                         let bank_idx = (instruction - op::LOAD_BASE) as usize;
-                        let addr = self.agent.genome[pc] as usize;
+                        let addr = agent.genome[pc] as usize;
                         pc += 1;
 
                         let value = unsafe { (*bank_ptrs[bank_idx])[addr & 0xFF] };
@@ -170,7 +160,7 @@ impl<'a> AgentExecutor<'a> {
                     }
                     op::STORE_BASE..=op::STORE_END => {
                         let bank_idx = (instruction - op::STORE_BASE) as usize;
-                        let addr = self.agent.genome[pc] as usize;
+                        let addr = agent.genome[pc] as usize;
                         pc += 1;
                         let value = stack.pop();
 
@@ -185,16 +175,16 @@ impl<'a> AgentExecutor<'a> {
                     }
                     op::LOADC_BASE..=op::LOADC_END => {
                         let bank_idx = (instruction - op::LOADC_BASE) as usize;
-                        let addr = self.agent.genome[pc] as usize;
+                        let addr = agent.genome[pc] as usize;
                         pc += 1;
-                        let count = self.agent.genome[pc] as usize;
+                        let count = agent.genome[pc] as usize;
                         pc += 1;
 
                         for i in 0..count {
                             stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                         }
                         let log_scale = (usize::BITS - count.leading_zeros()) as f32;
-                        self.agent.energy -= self.op_costs[instruction as usize] * log_scale;
+                        agent.energy -= self.op_costs[instruction as usize] * log_scale;
                     }
                     op::LOADC_IND_BASE..=op::LOADC_IND_END => {
                         let bank_idx = (instruction - op::LOADC_IND_BASE) as usize;
@@ -205,13 +195,13 @@ impl<'a> AgentExecutor<'a> {
                             stack.push(unsafe { (*bank_ptrs[bank_idx])[(addr + i) & 0xFF] });
                         }
                         let log_scale = (usize::BITS - count.leading_zeros()) as f32;
-                        self.agent.energy -= self.op_costs[instruction as usize] * log_scale;
+                        agent.energy -= self.op_costs[instruction as usize] * log_scale;
                     }
                     op::STOREC_BASE..=op::STOREC_END => {
                         let bank_idx = (instruction - op::STOREC_BASE) as usize;
-                        let addr = self.agent.genome[pc] as usize;
+                        let addr = agent.genome[pc] as usize;
                         pc += 1;
-                        let count = self.agent.genome[pc] as usize;
+                        let count = agent.genome[pc] as usize;
                         pc += 1;
 
                         for i in 0..count {
@@ -221,7 +211,7 @@ impl<'a> AgentExecutor<'a> {
                             };
                         }
                         let log_scale = (usize::BITS - count.leading_zeros()) as f32;
-                        self.agent.energy -= self.op_costs[instruction as usize] * log_scale;
+                        agent.energy -= self.op_costs[instruction as usize] * log_scale;
                     }
                     op::STOREC_IND_BASE..=op::STOREC_IND_END => {
                         let bank_idx = (instruction - op::STOREC_IND_BASE) as usize;
@@ -235,14 +225,14 @@ impl<'a> AgentExecutor<'a> {
                             };
                         }
                         let log_scale = (usize::BITS - count.leading_zeros()) as f32;
-                        self.agent.energy -= self.op_costs[instruction as usize] * log_scale;
+                        agent.energy -= self.op_costs[instruction as usize] * log_scale;
                     }
                     op::JUMP => {
-                        let offset = self.agent.genome[pc] as i8 as isize;
+                        let offset = agent.genome[pc] as i8 as isize;
                         pc = wrap_pc(pc as isize + 1 + offset);
                     }
                     op::JUMP_IF => {
-                        let offset = self.agent.genome[pc] as i8 as isize;
+                        let offset = agent.genome[pc] as i8 as isize;
                         pc += 1;
                         let cond = stack.pop();
                         if cond != 0 {
@@ -250,7 +240,7 @@ impl<'a> AgentExecutor<'a> {
                         }
                     }
                     op::JUMP_IF_NOT => {
-                        let offset = self.agent.genome[pc] as i8 as isize;
+                        let offset = agent.genome[pc] as i8 as isize;
                         pc += 1;
                         let cond = stack.pop();
                         if cond == 0 {
@@ -273,7 +263,7 @@ impl<'a> AgentExecutor<'a> {
                         stack.push(if a < b { 1 } else { 0 });
                     }
                     op::CALL => {
-                        let offset = self.agent.genome[pc] as i8 as isize;
+                        let offset = agent.genome[pc] as i8 as isize;
                         pc += 1;
                         call_stack.push(pc);
                         pc = wrap_pc(pc as isize + offset);
@@ -293,18 +283,18 @@ impl<'a> AgentExecutor<'a> {
                         let offset = stack.pop() as i8 as isize;
                         let value = stack.pop();
                         let target = wrap_pc(pc as isize + offset);
-                        self.agent.genome[target] = value;
+                        agent.genome[target] = value;
                     }
                     op::DOUBLE_SIZE => {
-                        let new_size = self.agent.genome.len() * 2;
+                        let new_size = agent.genome.len() * 2;
                         if new_size <= 4096 {
-                            self.agent.genome.resize(new_size, 0);
+                            agent.genome.resize(new_size, 0);
                         }
                     }
                     op::HALF_SIZE => {
-                        let new_size = self.agent.genome.len() / 2;
+                        let new_size = agent.genome.len() / 2;
                         if new_size >= 32 {
-                            self.agent.genome.resize(new_size, 0);
+                            agent.genome.resize(new_size, 0);
                         }
                     }
                     op::DIE => {
@@ -320,9 +310,9 @@ impl<'a> AgentExecutor<'a> {
                     op::SPAWN_CHILD => {
                         let val_u8 = stack.pop();
                         let energy = (val_u8 as f32) * 0.39215686; // Scale 0-255 to 0-100
-                        let genome = self.agent.base_genome.clone();
+                        let genome = agent.base_genome.clone();
                         syscalls.push(SysCall::SpawnChild { genome, energy });
-                        self.agent.energy -= energy;
+                        agent.energy -= energy;
                     }
                     op::GET_SP => {
                         stack.push(stack.len() as u8);
@@ -331,7 +321,7 @@ impl<'a> AgentExecutor<'a> {
                         stack.push(pc as u8);
                     }
                     op::GET_ENERGY => {
-                        stack.push(self.agent.energy.0 as u8);
+                        stack.push(agent.energy.0 as u8);
                     }
                     op::GET_ID => {
                         // TODO
@@ -343,7 +333,7 @@ impl<'a> AgentExecutor<'a> {
                         let mut val = (nbr_executed as usize)
                             .wrapping_add(pc)
                             .wrapping_add(stack.len())
-                            .wrapping_add(self.agent.energy.0 as usize);
+                            .wrapping_add(agent.energy.0 as usize);
 
                         // Simple high-speed bit-mixer
                         // This ensures that even if inputs only changes by small margins,
@@ -360,11 +350,11 @@ impl<'a> AgentExecutor<'a> {
                 break;
             }
 
-            self.agent.energy -= self.op_costs[instruction as usize];
+            agent.energy -= self.op_costs[instruction as usize];
             nbr_executed += 1;
         }
 
-        if pc >= self.agent.genome.len() {
+        if pc >= agent.genome.len() {
             ExecutionSummary {
                 reason: TerminationReason::TimedOut,
                 syscalls,
