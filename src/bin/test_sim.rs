@@ -1,11 +1,11 @@
-use lab_mltest::neural::AgentId;
+use lab_mltest::neural::{AgentId, AgentSpawner};
 use lab_mltest::sim::{CommunityId, Multiverse, SimulationRunner, SingleStepTask};
 use lab_mltest::vm::AgentExecutor;
 use lab_mltest::vm::isa::op;
 
 struct SimConfig {
     communities: usize,
-    agents_per_comm: usize,
+    min_population: usize,
     starting_energy: f32,
     tick_energy_budget: f32,
     ticks_per_gen: usize,
@@ -35,7 +35,7 @@ impl SingleStepTask for ConstantTask {
 fn main() -> anyhow::Result<()> {
     let config = SimConfig {
         communities: 2,
-        agents_per_comm: 50, // Bumped up for real evolution
+        min_population: 100,
         starting_energy: 10.0,
         tick_energy_budget: 1000.0,
         ticks_per_gen: 100,
@@ -49,7 +49,7 @@ fn main() -> anyhow::Result<()> {
     let mut multiverse = Multiverse::new_random(
         rng,
         config.communities,
-        config.agents_per_comm,
+        config.min_population,
         config.starting_energy,
     );
 
@@ -65,6 +65,9 @@ fn main() -> anyhow::Result<()> {
     println!("\n--- Starting Simulation Loop ---");
 
     let mut highest_survivors = 0;
+    let spawner = AgentSpawner {
+        spawn_energy: config.starting_energy,
+    };
 
     for generation in 0..=config.max_generations {
         runner.run_population_tick(
@@ -72,6 +75,8 @@ fn main() -> anyhow::Result<()> {
             &task,
             config.tick_energy_budget,
             config.ticks_per_gen,
+            config.min_population,
+            || spawner.new_random(rng),
         );
 
         // Explicit mutation step
@@ -109,7 +114,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         // Early stopping condition (e.g., 90% of max possible population survived)
-        let total_capacity = config.communities * config.agents_per_comm;
+        let total_capacity = config.communities * config.min_population;
         if survivor_count >= (total_capacity as f32 * 0.9) as usize {
             println!("🎯 Convergence reached! 90% survival rate.");
             break;

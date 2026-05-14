@@ -41,7 +41,6 @@ impl<'a> SimulationRunner<'a> {
     pub fn new(executor: &'a AgentExecutor<'a>) -> Self {
         Self { executor }
     }
-
     /// Orchestrate a full population tick: run agents, distribute energy, and resolve events.
     pub fn run_population_tick(
         &self,
@@ -49,6 +48,8 @@ impl<'a> SimulationRunner<'a> {
         task: &dyn SingleStepTask,
         total_energy: f32,
         max_steps: usize,
+        min_population: usize,
+        mut refill_fn: impl FnMut() -> crate::neural::Agent,
     ) {
         let (scores, all_events, dead_agents) =
             self.run_population(&mut multiverse.spaces, task, max_steps);
@@ -63,6 +64,12 @@ impl<'a> SimulationRunner<'a> {
 
         // 3. Resolve Events (Spawn/Migration)
         multiverse.resolve_events(all_events);
+
+        // 4. Population Balancing
+        while multiverse.population < min_population {
+            let new_agent = refill_fn();
+            multiverse.add_agent_to_random_community(new_agent);
+        }
     }
 
     pub fn mutate(

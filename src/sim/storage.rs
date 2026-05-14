@@ -17,6 +17,7 @@ pub struct CommunityManifest {
 #[derive(Serialize, Deserialize)]
 pub struct MultiverseManifest {
     pub communities: Vec<CommunityManifest>,
+    pub population: usize,
 }
 
 impl Community {
@@ -90,18 +91,23 @@ impl Multiverse {
             })
             .collect();
 
-        Ok(MultiverseManifest { communities })
+        Ok(MultiverseManifest {
+            communities,
+            population: self.population,
+        })
     }
 }
 
 impl MultiverseManifest {
     pub fn load(&self, folder: &Path) -> anyhow::Result<Multiverse> {
         let mut spaces = HashMap::new();
+        let mut population = 0;
         for community_manifest in &self.communities {
             let community = community_manifest.load(folder)?;
+            population += community.agents.len();
             spaces.insert(community_manifest.id, community);
         }
-        Ok(Multiverse { spaces })
+        Ok(Multiverse { spaces, population })
     }
 }
 
@@ -176,6 +182,7 @@ mod tests {
         let dir = tempdir()?;
         let mut multiverse = Multiverse {
             spaces: HashMap::new(),
+            population: 0,
         };
         multiverse
             .spaces
@@ -201,12 +208,14 @@ mod tests {
         let dir = tempdir()?;
         let multiverse = Multiverse {
             spaces: HashMap::new(),
+            population: 0,
         };
 
         let manifest = multiverse.save(dir.path())?;
         let loaded = manifest.load(dir.path())?;
 
         assert_eq!(loaded.spaces.len(), 0);
+        assert_eq!(loaded.population, 0);
         Ok(())
     }
 
@@ -214,7 +223,9 @@ mod tests {
     fn test_multiverse_high_level_persistence() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let mut multiverse = Multiverse::new();
-        multiverse.spaces.insert(CommunityId(1), create_test_community());
+        multiverse
+            .spaces
+            .insert(CommunityId(1), create_test_community());
 
         multiverse.save_to(dir.path())?;
         let loaded = Multiverse::load_from(dir.path())?;

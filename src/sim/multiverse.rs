@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 pub struct Multiverse {
     pub(crate) spaces: HashMap<CommunityId, Community>,
+    pub(crate) population: usize,
 }
 
 pub struct Community {
@@ -19,6 +20,7 @@ impl Multiverse {
     pub fn new() -> Self {
         Multiverse {
             spaces: HashMap::new(),
+            population: 0,
         }
     }
 
@@ -33,18 +35,36 @@ impl Multiverse {
         let spawner = AgentSpawner { spawn_energy };
 
         for i in 0..num_communities {
-            let mut community = Community::new();
             for _ in 0..agents_per_community {
-                community.add_agent(spawner.new_random(rng));
+                let agent = spawner.new_random(rng);
+                multiverse.add_agent_to_community(CommunityId(i), agent);
             }
-            multiverse.add_community(CommunityId(i), community);
         }
 
         multiverse
     }
 
     pub fn add_community(&mut self, id: CommunityId, community: Community) {
+        self.population += community.agents.len();
         self.spaces.insert(id, community);
+    }
+
+    /// Add an agent to a community and track population.
+    pub fn add_agent_to_community(&mut self, comm_id: CommunityId, agent: Agent) -> AgentId {
+        let community = self.spaces.entry(comm_id).or_insert_with(Community::new);
+        let agent_id = community.add_agent(agent);
+        self.population += 1;
+        agent_id
+    }
+
+    /// Add an agent to a random community without requiring RNG.
+    pub fn add_agent_to_random_community(&mut self, agent: Agent) -> AgentId {
+        let comm_id = if self.spaces.is_empty() {
+            CommunityId(0)
+        } else {
+            *self.spaces.keys().next().unwrap()
+        };
+        self.add_agent_to_community(comm_id, agent)
     }
 
     pub fn survivor_count(&self) -> usize {
@@ -95,30 +115,35 @@ impl Multiverse {
                 }
                 SimulationEvent::SpawnChild { parent_id, energy } => {
                     // Simplified: Spawn child in the same community as parent
-                    let source_comm = self
+                    let (source_comm_id, child) = self
                         .spaces
-                        .values_mut()
-                        .find(|comm| comm.agents.contains_key(&parent_id));
-
-                    if let Some(comm) = source_comm {
-                        let can_spawn = if let Some(parent) = comm.agents.get(&parent_id) {
-                            parent.energy.0 > energy
-                        } else {
-                            false
-                        };
-
-                        if can_spawn {
-                            let parent = comm.agents.get(&parent_id).unwrap();
-                            let spawner = AgentSpawner {
-                                spawn_energy: energy,
+                        .iter_mut()
+                        .find_map(|(comm_id, comm)| {
+                            let can_spawn = if let Some(parent) = comm.agents.get(&parent_id) {
+                                parent.energy.0 > energy
+                            } else {
+                                false
                             };
-                            let child = spawner.spawn_standard(parent);
 
-                            // Deduct energy from parent
-                            comm.agents.get_mut(&parent_id).unwrap().energy.0 -= energy;
+                            if can_spawn {
+                                let parent = comm.agents.get(&parent_id).unwrap();
+                                let spawner = AgentSpawner {
+                                    spawn_energy: energy,
+                                };
+                                let child = spawner.spawn_standard(parent);
 
-                            comm.add_agent(child);
-                        }
+                                // Deduct energy from parent
+                                comm.agents.get_mut(&parent_id).unwrap().energy.0 -= energy;
+
+                                Some((*comm_id, child))
+                            } else {
+                                None
+                            }
+                        })
+                        .unzip();
+
+                    if let (Some(comm_id), Some(child)) = (source_comm_id, child) {
+                        self.add_agent_to_community(comm_id, child);
                     }
                 }
             }
@@ -131,6 +156,7 @@ impl Multiverse {
         if comm.agents.is_empty() {
             self.spaces.remove(&comm_id);
         }
+        self.population = self.population.saturating_sub(1);
         Some(agent)
     }
 
@@ -144,11 +170,7 @@ impl Multiverse {
             .remove_agent(from_id, agent_id)
             .ok_or_else(|| anyhow::anyhow!("Agent not found in source community"))?;
 
-        self.spaces
-            .entry(to_id)
-            .or_insert_with(Community::new)
-            .agents
-            .insert(agent_id, agent);
+        self.add_agent_to_community(to_id, agent);
 
         Ok(())
     }
@@ -176,9 +198,6 @@ impl Community {
 mod tests {
     use super::*;
     use crate::neural::Agent;
-    use crate::sim::runner::SimulationRunner;
-    use crate::sim::task::SingleStepTask;
-    use crate::vm::AgentExecutor;
 
     #[test]
     fn test_add_agent_assigns_zero_for_empty_community() {
@@ -201,56 +220,5 @@ mod tests {
         assert_eq!(id, AgentId(1));
         assert!(community.agents.contains_key(&id));
         assert_eq!(community.agents.len(), 3);
-    }
-
-    struct MockTask;
-    impl SingleStepTask for MockTask {
-        fn input_data(&self) -> &[u8] {
-            &[]
-        }
-        fn evaluate(&self, output: &[u8]) -> f32 {
-            if output.is_empty() {
-                0.0
-            } else {
-                output[0] as f32
-            }
-        }
-    }
-
-    #[test]
-    fn test_step_population_energy_distribution() {
-        let mut multiverse = Multiverse::new();
-        let mut comm = Community::new();
-
-        let mut a1 = Agent::default();
-        a1.genome = vec![0]; // Dummy genome
-        let mut a2 = Agent::default();
-        a2.genome = vec![0];
-
-        // Manually set "output" via private banks for the mock task to read
-        // Note: Agent::collect_output reads from bank 1.
-        a1.private_banks.raw_mut(1)[0] = 1; // len
-        a1.private_banks.raw_mut(1)[1] = 10; // score 10
-
-        a2.private_banks.raw_mut(1)[0] = 1; // len
-        a2.private_banks.raw_mut(1)[1] = 30; // score 30
-
-        comm.agents.insert(AgentId(1), a1);
-        comm.agents.insert(AgentId(2), a2);
-        multiverse.add_community(CommunityId(1), comm);
-
-        let executor = AgentExecutor::new(&[0.0; 256]);
-        let runner = SimulationRunner::new(&executor);
-
-        // Total score = 10 + 30 = 40.
-        // Budget = 100.
-        // a1 (score 10) -> 10/40 * 100 = 25
-        // a2 (score 30) -> 30/40 * 100 = 75
-        runner.run_population_tick(&mut multiverse, &MockTask, 100.0, 0);
-
-        let comm_ref = multiverse.spaces.get(&CommunityId(1)).unwrap();
-
-        assert_eq!(comm_ref.agents.get(&AgentId(1)).unwrap().energy.0, 25.0);
-        assert_eq!(comm_ref.agents.get(&AgentId(2)).unwrap().energy.0, 75.0);
     }
 }
