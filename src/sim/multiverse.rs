@@ -79,6 +79,26 @@ impl Multiverse {
             .fold(0.0, f32::max)
     }
 
+    pub fn get_energy_stats(&self) -> (f32, f32, f32) {
+        let energies: Vec<f32> = self
+            .spaces
+            .values()
+            .flat_map(|c| c.agents.values())
+            .map(|a| a.get_energy())
+            .collect();
+
+        if energies.is_empty() {
+            return (0.0, 0.0, 0.0);
+        }
+
+        let min = energies.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+        let max = energies.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
+        let sum: f32 = energies.iter().sum();
+        let avg = sum / energies.len() as f32;
+
+        (min, max, avg)
+    }
+
     /// Obtain a session for a specific agent.
     pub fn session(
         &mut self,
