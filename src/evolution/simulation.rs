@@ -4,7 +4,6 @@ use crate::sim::SimulationRunner;
 use crate::neural::AgentSpawner;
 use crate::vm::AgentExecutor;
 use crate::neural::config::OP_COSTS;
-use std::path::PathBuf;
 
 pub struct EvolutionConfig {
     pub communities: usize,
@@ -13,8 +12,6 @@ pub struct EvolutionConfig {
     pub max_generations: usize,
     pub tick_energy_budget: f32,
     pub ticks_per_gen: usize,
-    pub save_interval: Option<usize>,
-    pub checkpoint_dir: Option<PathBuf>,
 }
 
 pub struct EvolutionEngine<'a> {
@@ -32,6 +29,13 @@ pub trait EvolutionHook {
 impl<T: EvolutionHook> EvolutionHook for &mut T {
     fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
         (**self).on_generation_complete(generation, multiverse)
+    }
+}
+
+impl EvolutionHook for Vec<Box<dyn EvolutionHook>> {
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
+        self.iter_mut()
+            .fold(true, |acc, hook| hook.on_generation_complete(generation, multiverse) && acc)
     }
 }
 
@@ -68,15 +72,6 @@ impl<'a> EvolutionEngine<'a> {
             runner.mutate(rng, &mut self.multiverse);
 
             let should_continue = hook.on_generation_complete(generation, &self.multiverse);
-
-            if let Some(interval) = self.config.save_interval {
-                if generation > 0 && generation % interval == 0 {
-                    if let Some(ref dir) = self.config.checkpoint_dir {
-                        let path = dir.join(format!("gen_{}", generation));
-                        self.multiverse.save_to(path.to_str().unwrap())?;
-                    }
-                }
-            }
 
             if self.multiverse.survivor_count() == 0 || !should_continue {
                 break;

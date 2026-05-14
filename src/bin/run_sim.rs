@@ -1,4 +1,7 @@
-use lab_mltest::evolution::{EvolutionConfig, EvolutionEngine, EvolutionHook};
+use lab_mltest::evolution::{
+    BestModelHook, CheckpointHook, EvolutionConfig, EvolutionEngine, EvolutionHook,
+    PopulationTargetHook, PrintStatsHook,
+};
 use lab_mltest::neural::AgentSpawner;
 use lab_mltest::sim::{Multiverse, SingleStepTask};
 use std::path::PathBuf;
@@ -25,39 +28,6 @@ impl SingleStepTask for ConstantTask {
     }
 }
 
-struct StatsHook {
-    highest_survivors: usize,
-    target_pop: usize,
-}
-
-impl EvolutionHook for StatsHook {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
-        let survivor_count = multiverse.survivor_count();
-        let (_min_e, max_e, avg_e) = multiverse.get_energy_stats();
-
-        if generation % 10 == 0 || survivor_count > self.highest_survivors {
-            println!(
-                "Gen {:03} | Survivors: {:4} | Max Energy: {:.2} | Avg: {:.2}",
-                generation, survivor_count, max_e, avg_e
-            );
-        }
-
-        if survivor_count > self.highest_survivors {
-            self.highest_survivors = survivor_count;
-            println!(">> 🏆 New survivor record!");
-            let _ = multiverse.save_to("checkpoints/best_engine_model");
-        }
-
-        // Early exit condition
-        if survivor_count >= self.target_pop {
-            println!("🎯 Convergence reached!");
-            return false; // Stop simulation
-        }
-
-        true // Continue simulation
-    }
-}
-
 fn main() -> anyhow::Result<()> {
     let config = EvolutionConfig {
         communities: 4,
@@ -66,8 +36,6 @@ fn main() -> anyhow::Result<()> {
         tick_energy_budget: 20.0,
         ticks_per_gen: 150,
         max_generations: 1000,
-        save_interval: Some(500),
-        checkpoint_dir: Some(PathBuf::from("checkpoints")),
     };
 
     let rng = &mut rand::rng();
@@ -84,13 +52,24 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut engine = EvolutionEngine::new(config, multiverse, &task, spawner);
-    let mut hook = StatsHook {
+
+    let mut hooks: Vec<Box<dyn EvolutionHook>> = Vec::new();
+    hooks.push(Box::new(PrintStatsHook {
+        interval: 10,
         highest_survivors: 0,
-        target_pop: 4 * 20,
-    };
+    }));
+    hooks.push(Box::new(PopulationTargetHook { target: 4 * 20 }));
+    hooks.push(Box::new(CheckpointHook {
+        interval: 500,
+        dir: PathBuf::from("checkpoints"),
+    }));
+    hooks.push(Box::new(BestModelHook {
+        highest_survivors: 0,
+        path: "checkpoints/best_engine_model".to_string(),
+    }));
 
     println!("--- Starting Evolution Engine ---");
-    engine.run(rng, &mut hook)?;
+    engine.run(rng, hooks)?;
     println!("--- Engine Run Complete ---");
 
     Ok(())
