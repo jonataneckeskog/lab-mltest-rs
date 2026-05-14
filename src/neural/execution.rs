@@ -21,12 +21,24 @@ pub enum SysCall {
     LeaveCommunity { community_id: u8 },
 }
 
+pub struct AgentContext {
+    pub id: u8,
+    pub community_id: u8,
+    pub generation: u32,
+    pub world_time: u64,
+}
+
 impl<'a> AgentExecutor<'a> {
     pub fn new(shared: &'a mut SharedBanks, op_costs: &'a [f32; 256]) -> Self {
         Self { shared, op_costs }
     }
 
-    pub fn run(&mut self, agent: &'a mut Agent, max_steps: usize) -> ExecutionSummary {
+    pub fn run(
+        &mut self,
+        agent: &'a mut Agent,
+        ctx: &AgentContext,
+        max_steps: usize,
+    ) -> ExecutionSummary {
         let mut pc = 0;
         let mut nbr_executed = 0;
         let mut stack = ByteStack::new();
@@ -324,10 +336,10 @@ impl<'a> AgentExecutor<'a> {
                         stack.push(agent.energy.0 as u8);
                     }
                     op::GET_ID => {
-                        // TODO
+                        stack.push(ctx.id);
                     }
                     op::GET_COMMUNITY_ID => {
-                        // TODO
+                        stack.push(ctx.community_id);
                     }
                     op::RNG => {
                         let mut val = (nbr_executed as usize)
