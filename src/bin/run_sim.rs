@@ -1,76 +1,41 @@
-use lab_mltest::evolution::{
-    BestModelHook, CheckpointHook, EvolutionConfig, EvolutionEngine, EvolutionHook,
-    PopulationTargetHook, PrintStatsHook,
-};
-use lab_mltest::neural::AgentSpawner;
-use lab_mltest::sim::{Multiverse, SingleStepTask};
+use lab_mltest::evolution::hooks::basics::{CheckpointHook, PrintStatsHook};
+use lab_mltest::evolution::{EvolutionConfig, EvolutionHook};
+use lab_mltest::tasks::constant::ConstantTask;
+use lab_mltest::templates::basic::create_pluggable_engine;
 use std::path::PathBuf;
 
-struct ConstantTask {
-    target: u8,
-}
-
-impl SingleStepTask for ConstantTask {
-    fn input_data(&self) -> &[u8] {
-        &[]
-    }
-    fn evaluate(&self, output: &[u8]) -> f32 {
-        if output.is_empty() {
-            return 0.0;
-        }
-        let mut score = 0.1;
-        let diff = (output[0] as i16 - self.target as i16).abs();
-        score += (1.0 - (diff as f32 / 255.0)) * 0.4;
-        if output[0] == self.target {
-            score += 0.5;
-        }
-        score
-    }
-}
-
 fn main() -> anyhow::Result<()> {
+    let task = ConstantTask { target: 123 };
+
+    // 1. Define a custom configuration
     let config = EvolutionConfig {
-        communities: 4,
-        min_population: 20,
-        starting_energy: 5.0,
-        tick_energy_budget: 20.0,
-        ticks_per_gen: 150,
-        max_generations: 1000,
+        communities: 2,
+        min_population: 50,
+        starting_energy: 10.0,
+        tick_energy_budget: 50.0,
+        ticks_per_gen: 200,
+        max_generations: 500,
     };
 
+    // 2. Prepare your own specific set of plugins/hooks
+    let mut my_plugins: Vec<Box<dyn EvolutionHook>> = Vec::new();
+    my_plugins.push(Box::new(PrintStatsHook {
+        interval: 25, // Log less frequently
+        highest_survivors: 0,
+    }));
+    my_plugins.push(Box::new(CheckpointHook {
+        interval: 100,
+        dir: PathBuf::from("sim_checkpoints"),
+    }));
+
+    // 3. Use the pluggable template to wire everything together
+    // This handles the Multiverse and Spawner creation for you.
+    let (mut engine, hooks) = create_pluggable_engine(config, &task, my_plugins);
+
+    println!("--- Starting Pluggable Simulation ---");
     let rng = &mut rand::rng();
-    let multiverse = Multiverse::new_random(
-        rng,
-        config.communities,
-        config.min_population,
-        config.starting_energy,
-    );
-
-    let task = ConstantTask { target: 42 };
-    let spawner = AgentSpawner {
-        spawn_energy: config.starting_energy,
-    };
-
-    let mut engine = EvolutionEngine::new(config, multiverse, &task, spawner);
-
-    let mut hooks: Vec<Box<dyn EvolutionHook>> = Vec::new();
-    hooks.push(Box::new(PrintStatsHook {
-        interval: 10,
-        highest_survivors: 0,
-    }));
-    hooks.push(Box::new(PopulationTargetHook { target: 4 * 20 }));
-    hooks.push(Box::new(CheckpointHook {
-        interval: 500,
-        dir: PathBuf::from("checkpoints"),
-    }));
-    hooks.push(Box::new(BestModelHook {
-        highest_survivors: 0,
-        path: "checkpoints/best_engine_model".to_string(),
-    }));
-
-    println!("--- Starting Evolution Engine ---");
     engine.run(rng, hooks)?;
-    println!("--- Engine Run Complete ---");
+    println!("--- Simulation Complete ---");
 
     Ok(())
 }

@@ -1,6 +1,6 @@
-use super::EvolutionHook;
-use crate::sim::Multiverse;
 use std::path::PathBuf;
+use crate::sim::Multiverse;
+use crate::evolution::EvolutionHook;
 
 pub struct CheckpointHook {
     pub interval: usize,
@@ -53,22 +53,6 @@ impl EvolutionHook for PopulationTargetHook {
         if survivor_count >= self.target {
             println!("🎯 Convergence reached ({} survivors)!", survivor_count);
             return false;
-        }
-        true
-    }
-}
-
-pub struct BestModelHook {
-    pub highest_survivors: usize,
-    pub path: String,
-}
-
-impl EvolutionHook for BestModelHook {
-    fn on_generation_complete(&mut self, _generation: usize, multiverse: &Multiverse) -> bool {
-        let survivor_count = multiverse.survivor_count();
-        if survivor_count > self.highest_survivors {
-            self.highest_survivors = survivor_count;
-            let _ = multiverse.save_to(&self.path);
         }
         true
     }
