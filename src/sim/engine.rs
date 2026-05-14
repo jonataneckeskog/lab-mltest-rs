@@ -1,6 +1,6 @@
 use crate::neural::AgentId;
-use crate::vm::{ByteStack, VmContext, op};
 use crate::sim::storage::CommunityId;
+use crate::vm::{ByteStack, VmContext, op};
 
 pub struct SimulationContext {
     pub agent_id: AgentId,
@@ -67,7 +67,7 @@ impl VmContext for SimulationContext {
                 });
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 }
@@ -88,7 +88,11 @@ mod tests {
 
         assert!(result);
         assert_eq!(ctx.events.len(), 1);
-        if let SimulationEvent::LeaveCommunity { agent_id, target_community_id } = &ctx.events[0] {
+        if let SimulationEvent::LeaveCommunity {
+            agent_id,
+            target_community_id,
+        } = &ctx.events[0]
+        {
             assert_eq!(agent_id.0, 10);
             assert_eq!(target_community_id.0, 5);
         } else {

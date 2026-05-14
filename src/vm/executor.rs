@@ -1,4 +1,8 @@
-use crate::vm::{isa::op, stack::ByteStack, traits::{VmContext, VmMemory}};
+use crate::vm::{
+    isa::op,
+    stack::ByteStack,
+    traits::{VmContext, VmMemory},
+};
 
 pub struct AgentExecutor<'a> {
     op_costs: &'a [f32; 256],
@@ -33,6 +37,15 @@ impl<'a> AgentExecutor<'a> {
 
         let genome_mask = memory.genome_len().saturating_sub(1);
         let wrap_pc = |pos: isize| -> usize { (pos as usize) & genome_mask };
+        macro_rules! syst_call {
+            ($ctx:expr, $stack:expr, $instr:expr) => {
+                if !$ctx.syscall($instr, &mut $stack) {
+                    return ExecutionSummary {
+                        reason: TerminationReason::Halted { confidence: 0 },
+                    };
+                }
+            };
+        }
 
         while nbr_executed < max_steps && pc < memory.genome_len() && memory.get_energy() > 0.0 {
             let mut instruction = memory.read_genome(pc);
@@ -278,11 +291,13 @@ impl<'a> AgentExecutor<'a> {
                             reason: TerminationReason::Died,
                         };
                     }
-                    op::LEAVE_COMMUNITY | op::SPAWN_CHILD => {
-                        if !ctx.syscall(instruction, &mut stack) {
-                            return ExecutionSummary {
-                                reason: TerminationReason::Halted { confidence: 0 },
-                            };
+                    op::LEAVE_COMMUNITY => {
+                        syst_call!(ctx, stack, instruction);
+                    }
+                    op::SPAWN_CHILD => {
+                        let spent_energy = stack.peek() as f32 * 0.39215686;
+                        if spent_energy <= memory.get_energy() {
+                            syst_call!(ctx, stack, instruction);
                         }
                     }
                     op::GET_SP => {
