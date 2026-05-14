@@ -59,6 +59,26 @@ impl CommunityManifest {
 }
 
 impl Multiverse {
+    pub fn save_to(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let folder = path.as_ref();
+        if !folder.exists() {
+            std::fs::create_dir_all(folder)?;
+        }
+        let manifest = self.save(folder)?;
+        let manifest_path = folder.join("multiverse.json");
+        let file = std::fs::File::create(manifest_path)?;
+        serde_json::to_writer_pretty(file, &manifest)?;
+        Ok(())
+    }
+
+    pub fn load_from(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let folder = path.as_ref();
+        let manifest_path = folder.join("multiverse.json");
+        let file = std::fs::File::open(manifest_path)?;
+        let manifest: MultiverseManifest = serde_json::from_reader(file)?;
+        manifest.load(folder)
+    }
+
     pub fn save(&self, folder: &Path) -> std::io::Result<MultiverseManifest> {
         let communities = self
             .spaces
@@ -191,31 +211,16 @@ mod tests {
     }
 
     #[test]
-    fn test_community_manifest_serialization() -> anyhow::Result<()> {
-        let manifest = CommunityManifest {
-            agents: vec![AgentManifest {
-                energy: 10.0,
-                base_genome_path: std::path::PathBuf::from("bg.bin"),
-                genome_path: std::path::PathBuf::from("g.bin"),
-                banks: BankManifest {
-                    raw_data_path: std::path::PathBuf::from("b.bin"),
-                    bank_count: 6,
-                },
-                id: AgentId(1),
-            }],
-            shared_banks: BankManifest {
-                raw_data_path: std::path::PathBuf::from("s.bin"),
-                bank_count: 2,
-            },
-            id: CommunityId(5),
-        };
+    fn test_multiverse_high_level_persistence() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let mut multiverse = Multiverse::new();
+        multiverse.spaces.insert(CommunityId(1), create_test_community());
 
-        let encoded = bincode::serialize(&manifest)?;
-        let decoded: CommunityManifest = bincode::deserialize(&encoded)?;
+        multiverse.save_to(dir.path())?;
+        let loaded = Multiverse::load_from(dir.path())?;
 
-        assert_eq!(decoded.id, CommunityId(5));
-        assert_eq!(decoded.agents.len(), 1);
-        assert_eq!(decoded.shared_banks.bank_count, 2);
+        assert_eq!(multiverse.spaces.len(), loaded.spaces.len());
+        assert!(loaded.spaces.contains_key(&CommunityId(1)));
         Ok(())
     }
 }
