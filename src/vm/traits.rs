@@ -12,8 +12,12 @@ pub trait VmMemory {
     fn write_bank(&mut self, bank_idx: usize, addr: u8, val: u8);
 
     fn get_energy(&self) -> f32;
+
+    fn get_age(&self) -> u64;
+
     fn consume_energy(&mut self, amount: f32);
-}
+    }
+
 
 pub trait VmContext {
     fn agent_id(&self) -> u8;

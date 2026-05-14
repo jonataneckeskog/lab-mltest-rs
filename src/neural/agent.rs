@@ -1,4 +1,8 @@
-use crate::neural::{genome::Genome, memory::{PrivateBanks, SharedBanks}, config::MutationSettings};
+use crate::neural::{
+    config::MutationSettings,
+    genome::Genome,
+    memory::{PrivateBanks, SharedBanks},
+};
 use crate::vm::traits::VmMemory;
 use ordered_float::OrderedFloat;
 
@@ -8,6 +12,7 @@ pub struct Agent {
     pub(crate) genome: Vec<u8>,
     pub(crate) private_banks: PrivateBanks,
     pub(crate) energy: OrderedFloat<f32>,
+    pub age: u64,
 }
 
 impl Default for Agent {
@@ -17,6 +22,7 @@ impl Default for Agent {
             genome: Vec::with_capacity(32),
             private_banks: PrivateBanks::default(),
             energy: OrderedFloat(0.0),
+            age: 0,
         }
     }
 }
@@ -77,7 +83,11 @@ impl<'a> AgentVmMemory<'a> {
             shared.raw_mut(0).as_mut_ptr(),
             shared.raw_mut(1).as_mut_ptr(),
         ];
-        Self { agent, shared, bank_ptrs }
+        Self {
+            agent,
+            shared,
+            bank_ptrs,
+        }
     }
 }
 
@@ -114,7 +124,12 @@ impl<'a> VmMemory for AgentVmMemory<'a> {
         self.agent.energy.0
     }
 
+    fn get_age(&self) -> u64 {
+        self.agent.age
+    }
+
     fn consume_energy(&mut self, amount: f32) {
-        self.agent.energy.0 -= amount;
+        let metabolic_tax = (1.0 - (self.agent.age as f32 * 0.00000001)).max(0.0);
+        self.agent.energy.0 = ((self.agent.energy.0 - amount) * metabolic_tax).max(0.0);
     }
 }

@@ -117,6 +117,7 @@ impl<'a> SimulationRunner<'a> {
 
         for (comm_id, community) in spaces {
             for (agent_id, agent) in &mut community.agents {
+                agent.age += 1; // Increment age every tick
                 agent.load_input(input);
 
                 let mut ctx = SimulationContext::new(*agent_id, *comm_id);
@@ -195,16 +196,6 @@ impl<'a> SimulationRunner<'a> {
                     .and_then(|c| c.agents.get_mut(&agent_id))
                 {
                     agent.energy.0 += reward; // Additive
-                }
-            }
-        } else if !scores.is_empty() {
-            let share = total_energy / scores.len() as f32;
-            for (comm_id, agent_id, _) in scores {
-                if let Some(agent) = spaces
-                    .get_mut(&comm_id)
-                    .and_then(|c| c.agents.get_mut(&agent_id))
-                {
-                    agent.energy.0 += share; // Additive
                 }
             }
         }

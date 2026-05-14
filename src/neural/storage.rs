@@ -14,6 +14,7 @@ pub struct AgentId(pub usize);
 #[derive(Serialize, Deserialize)]
 pub struct AgentManifest {
     pub energy: f32,
+    pub age: u64,
     pub base_genome_path: PathBuf,
     pub genome_path: PathBuf,
     pub banks: BankManifest,
@@ -75,6 +76,7 @@ impl Agent {
 
         Ok(AgentManifest {
             energy: self.energy.0,
+            age: self.age,
             genome_path: PathBuf::from(genome_filename),
             base_genome_path: PathBuf::from(base_genome_filename),
             banks: bank_manifest,
@@ -95,6 +97,7 @@ impl AgentManifest {
             base_genome: Genome::new(base_genome),
             private_banks: banks,
             energy: OrderedFloat(self.energy),
+            age: self.age,
         })
     }
 }
@@ -183,6 +186,7 @@ mod tests {
         // Tests if the AgentManifest JSON/Bincode itself is valid
         let manifest = AgentManifest {
             energy: 10.0,
+            age: 5,
             base_genome_path: PathBuf::from("bg.bin"),
             genome_path: PathBuf::from("g.bin"),
             banks: BankManifest {
@@ -196,6 +200,7 @@ mod tests {
         let decoded: AgentManifest = bincode::deserialize(&encoded)?;
 
         assert_eq!(decoded.energy, 10.0);
+        assert_eq!(decoded.age, 5);
         assert_eq!(decoded.banks.bank_count, 6);
         Ok(())
     }

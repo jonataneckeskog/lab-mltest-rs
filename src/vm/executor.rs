@@ -310,6 +310,9 @@ impl<'a> AgentExecutor<'a> {
                     op::GET_COMMUNITY_ID => {
                         stack.push(ctx.community_id());
                     }
+                    op::GET_AGE => {
+                        stack.push((memory.get_age() & 0xFF) as u8);
+                    }
                     op::RNG => {
                         let val = (nbr_executed as usize)
                             .wrapping_add(pc)

@@ -84,4 +84,5 @@ pub mod op {
     pub const GET_ID: u8 = 251; // Pushes the Agent's unique ID to stack
     pub const GET_COMMUNITY_ID: u8 = 252; // Pushes the current Community ID to stack
     pub const RNG: u8 = 253; // Pushes a random byte ( -- v)
+    pub const GET_AGE: u8 = 254; // Pushes the agent's current age to stack
 }
