@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     neural::{Agent, AgentId, SharedBanks},
-    sim::storage::CommunityId,
     sim::engine::SimulationEvent,
     sim::runner::AgentSession,
+    sim::storage::CommunityId,
 };
 
 pub struct Multiverse {
@@ -28,12 +28,20 @@ impl Multiverse {
     }
 
     /// Obtain a session for a specific agent.
-    pub fn session(&mut self, comm_id: CommunityId, agent_id: AgentId) -> anyhow::Result<AgentSession<'_>> {
-        let community = self.spaces.get_mut(&comm_id)
+    pub fn session(
+        &mut self,
+        comm_id: CommunityId,
+        agent_id: AgentId,
+    ) -> anyhow::Result<AgentSession<'_>> {
+        let community = self
+            .spaces
+            .get_mut(&comm_id)
             .ok_or_else(|| anyhow::anyhow!("Community not found"))?;
-        let agent = community.agents.get_mut(&agent_id)
+        let agent = community
+            .agents
+            .get_mut(&agent_id)
             .ok_or_else(|| anyhow::anyhow!("Agent not found"))?;
-            
+
         Ok(AgentSession::new(
             agent,
             comm_id,
@@ -93,29 +101,6 @@ impl Multiverse {
         }
     }
 
-    // Formula for Balanced Complexity:
-    // TotalEnergy = (TargetCPU / CurrentCPU)^p * log2(N + 1) * K
-    //
-    // - (TargetCPU / CurrentCPU)^p: The Governor (punishes big/slow agents via actual CPU load)
-    // - log2(N + 1): The Diversity Reward (rewards having "enough" agents, then tapers off)
-    // - K: Global scalar constant
-    pub fn compute_global_energy(&self, current_cpu: f32, target_cpu: f32, k: f32, p: f32) -> f32 {
-        let n = self.spaces.values().map(|c| c.agents.len()).sum::<usize>() as f32;
-
-        if n == 0.0 {
-            return k;
-        }
-
-        // Governor: Punishes based on actual CPU load (where 'Big' agents naturally hit harder)
-        let governor = (target_cpu / current_cpu.max(0.001)).powf(p);
-
-        // Population Reward: log2 provides a "Satiation" curve.
-        // 1 -> 80 agents is a massive bonus; 80 -> 5000 is a diminishing return.
-        let population_reward = (n + 1.0).log2();
-
-        governor * population_reward * k
-    }
-
     pub fn migrate_agent(
         &mut self,
         from_id: CommunityId,
@@ -162,9 +147,9 @@ impl Community {
 mod tests {
     use super::*;
     use crate::neural::Agent;
-    use crate::vm::AgentExecutor;
-    use crate::sim::task::SingleStepTask;
     use crate::sim::runner::SimulationRunner;
+    use crate::sim::task::SingleStepTask;
+    use crate::vm::AgentExecutor;
 
     #[test]
     fn test_add_agent_assigns_zero_for_empty_community() {
@@ -191,9 +176,15 @@ mod tests {
 
     struct MockTask;
     impl SingleStepTask for MockTask {
-        fn input_data(&self) -> &[u8] { &[] }
+        fn input_data(&self) -> &[u8] {
+            &[]
+        }
         fn evaluate(&self, output: &[u8]) -> f32 {
-            if output.is_empty() { 0.0 } else { output[0] as f32 }
+            if output.is_empty() {
+                0.0
+            } else {
+                output[0] as f32
+            }
         }
     }
 
@@ -233,5 +224,4 @@ mod tests {
         assert_eq!(comm_ref.agents.get(&AgentId(1)).unwrap().energy.0, 25.0);
         assert_eq!(comm_ref.agents.get(&AgentId(2)).unwrap().energy.0, 75.0);
     }
-    }
-
+}

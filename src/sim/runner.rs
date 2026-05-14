@@ -32,15 +32,6 @@ impl<'a> AgentSession<'a> {
             events: Vec::new(),
         }
     }
-
-    pub fn run(&mut self, executor: &AgentExecutor, max_steps: usize) {
-        let mut ctx = SimulationContext::new(AgentId(0), self.community_id);
-        {
-            let mut memory = AgentVmMemory::new(self.agent, self.shared_banks);
-            executor.run(&mut memory, &mut ctx, max_steps);
-        }
-        self.events.extend(ctx.events);
-    }
 }
 
 impl<'a> SimulationRunner<'a> {
@@ -81,14 +72,17 @@ impl<'a> SimulationRunner<'a> {
             for (agent_id, agent) in &mut community.agents {
                 agent.load_input(input);
 
-                let mut sess = AgentSession::new(agent, *comm_id, &mut community.shared_comms);
-                sess.run(self.executor, max_steps);
+                let mut ctx = SimulationContext::new(*agent_id, *comm_id);
+                {
+                    let mut memory = AgentVmMemory::new(agent, &mut community.shared_comms);
+                    self.executor.run(&mut memory, &mut ctx, max_steps);
+                }
 
-                let output = sess.agent.collect_output();
+                let output = agent.collect_output();
                 let score = task.evaluate(&output).max(0.0);
 
                 scores.push((*comm_id, *agent_id, score));
-                all_events.extend(sess.events);
+                all_events.extend(ctx.events);
             }
         }
 
@@ -96,23 +90,30 @@ impl<'a> SimulationRunner<'a> {
     }
 
     /// Run a multi-step task for a specific agent session.
+    /// Rewards are applied immediately to the agent's energy at each step.
     pub fn run_multi(
         &self,
         session: &mut AgentSession,
         task: &mut dyn MultiStepTask,
+        step_energy_budget: f32,
         max_steps_per_tick: usize,
-    ) -> f32 {
-        let mut total_score = 0.0;
-
-        while !task.is_finished() {
+    ) {
+        while !task.is_finished() && session.agent.energy.0 > 0.0 {
             session.agent.load_input(task.next_input());
-            session.run(self.executor, max_steps_per_tick);
+
+            let mut ctx = SimulationContext::new(AgentId(0), session.community_id);
+            {
+                let mut memory = AgentVmMemory::new(session.agent, session.shared_banks);
+                self.executor.run(&mut memory, &mut ctx, max_steps_per_tick);
+            }
+            session.events.extend(ctx.events);
 
             let output = session.agent.collect_output();
-            total_score += task.step(&output);
-        }
+            let performance = task.step(&output).max(0.0);
 
-        total_score
+            // Immediate reward injection
+            session.agent.energy.0 += performance * step_energy_budget;
+        }
     }
 
     fn distribute_energy_by_scores(
