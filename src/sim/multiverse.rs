@@ -71,6 +71,14 @@ impl Multiverse {
         self.spaces.values().map(|c| c.agents.len()).sum()
     }
 
+    pub fn get_max_energy(&self) -> f32 {
+        self.spaces
+            .values()
+            .flat_map(|c| c.agents.values())
+            .map(|a| a.get_energy())
+            .fold(0.0, f32::max)
+    }
+
     /// Obtain a session for a specific agent.
     pub fn session(
         &mut self,
