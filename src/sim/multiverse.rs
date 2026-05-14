@@ -246,7 +246,8 @@ mod tests {
         // Budget = 100.
         // a1 (score 10) -> 10/40 * 100 = 25
         // a2 (score 30) -> 30/40 * 100 = 75
-        runner.run_population_tick(&mut multiverse, &MockTask, 100.0, 0);
+        let mut rng = rand::rng();
+        runner.run_population_tick(&mut rng, &mut multiverse, &MockTask, 100.0, 0);
 
         let comm_ref = multiverse.spaces.get(&CommunityId(1)).unwrap();
 
