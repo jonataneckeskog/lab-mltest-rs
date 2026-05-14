@@ -45,7 +45,6 @@ impl<'a> SimulationRunner<'a> {
     /// Orchestrate a full population tick: run agents, distribute energy, and resolve events.
     pub fn run_population_tick(
         &self,
-        rng: &mut impl rand::Rng,
         multiverse: &mut crate::sim::multiverse::Multiverse,
         task: &dyn SingleStepTask,
         total_energy: f32,
@@ -64,12 +63,9 @@ impl<'a> SimulationRunner<'a> {
 
         // 3. Resolve Events (Spawn/Migration)
         multiverse.resolve_events(all_events);
-
-        // 4. Mutation
-        self.mutate(rng, multiverse);
     }
 
-    fn mutate(
+    pub fn mutate(
         &self,
         rng: &mut impl rand::Rng,
         multiverse: &mut crate::sim::multiverse::Multiverse,
@@ -81,16 +77,32 @@ impl<'a> SimulationRunner<'a> {
                     continue;
                 }
 
-                // Probability of a bit flip per byte.
+                // Probability of a bit flip per bit.
                 // 255 = ~1% chance per bit (very high)
-                // We'll scale it so 255 is a significant but reasonable rate.
-                // If cosmic_ray_rate is 255, let's say 1/100 chance per bit.
                 let prob = (settings.cosmic_ray_rate as f64) / (255.0 * 100.0);
+                let total_bits = agent.genome.len() * 8;
 
-                for byte in agent.genome.iter_mut() {
-                    for bit in 0..8 {
-                        if rng.random_bool(prob) {
-                            *byte ^= 1 << bit;
+                let log_q = (1.0 - prob).ln();
+                let mut bit_idx = 0;
+
+                while bit_idx < total_bits {
+                    let u: f64 = rng.random();
+
+                    let u_bits = u.to_bits();
+                    let exponent = ((u_bits >> 52) & 0x7FF) as i32 - 1023;
+                    let mantissa_fraction =
+                        (u_bits & 0xF_FFFF_FFFF_FFFF) as f64 / 4503599627370496.0;
+
+                    let approx_ln_u = (exponent as f64 * 0.69314718) + mantissa_fraction;
+
+                    let jump = (approx_ln_u / log_q).floor() as usize;
+                    bit_idx += jump + 1;
+
+                    if bit_idx < total_bits {
+                        let byte_idx = bit_idx / 8;
+                        let bit_in_byte = bit_idx % 8;
+                        if let Some(byte) = agent.genome.get_mut(byte_idx) {
+                            *byte ^= 1 << bit_in_byte;
                         }
                     }
                 }

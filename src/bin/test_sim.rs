@@ -68,12 +68,14 @@ fn main() -> anyhow::Result<()> {
 
     for generation in 0..=config.max_generations {
         runner.run_population_tick(
-            rng,
             &mut multiverse,
             &task,
             config.tick_energy_budget,
             config.ticks_per_gen,
         );
+
+        // Explicit mutation step
+        runner.mutate(rng, &mut multiverse);
 
         let survivor_count = multiverse.survivor_count();
 
