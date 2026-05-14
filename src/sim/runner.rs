@@ -7,6 +7,7 @@ use crate::{
     },
     vm::{AgentExecutor, TerminationReason},
 };
+use rand::RngExt;
 
 /// A Session provides a direct interface to manipulate and run a single agent
 /// within the context of its community and the multiverse.
@@ -44,6 +45,7 @@ impl<'a> SimulationRunner<'a> {
     /// Orchestrate a full population tick: run agents, distribute energy, and resolve events.
     pub fn run_population_tick(
         &self,
+        rng: &mut impl rand::Rng,
         multiverse: &mut crate::sim::multiverse::Multiverse,
         task: &dyn SingleStepTask,
         total_energy: f32,
@@ -62,6 +64,38 @@ impl<'a> SimulationRunner<'a> {
 
         // 3. Resolve Events (Spawn/Migration)
         multiverse.resolve_events(all_events);
+
+        // 4. Mutation
+        self.mutate(rng, multiverse);
+    }
+
+    fn mutate(
+        &self,
+        rng: &mut impl rand::Rng,
+        multiverse: &mut crate::sim::multiverse::Multiverse,
+    ) {
+        for community in multiverse.spaces.values_mut() {
+            for agent in community.agents.values_mut() {
+                let settings = agent.get_mutation_settings();
+                if settings.cosmic_ray_rate == 0 {
+                    continue;
+                }
+
+                // Probability of a bit flip per byte.
+                // 255 = ~1% chance per bit (very high)
+                // We'll scale it so 255 is a significant but reasonable rate.
+                // If cosmic_ray_rate is 255, let's say 1/100 chance per bit.
+                let prob = (settings.cosmic_ray_rate as f64) / (255.0 * 100.0);
+
+                for byte in agent.genome.iter_mut() {
+                    for bit in 0..8 {
+                        if rng.random_bool(prob) {
+                            *byte ^= 1 << bit;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Run a single step task across an entire population.

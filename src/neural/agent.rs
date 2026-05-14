@@ -1,4 +1,4 @@
-use crate::neural::{genome::Genome, memory::{PrivateBanks, SharedBanks}};
+use crate::neural::{genome::Genome, memory::{PrivateBanks, SharedBanks}, config::MutationSettings};
 use crate::vm::traits::VmMemory;
 use ordered_float::OrderedFloat;
 
@@ -22,6 +22,18 @@ impl Default for Agent {
 }
 
 impl Agent {
+    pub fn set_mutation_settings(&mut self, settings: MutationSettings) {
+        let bank = self.private_banks.raw_mut(5);
+        bank[0] = settings.cosmic_ray_rate;
+    }
+
+    pub fn get_mutation_settings(&self) -> MutationSettings {
+        let bank = &self.private_banks.0[5];
+        MutationSettings {
+            cosmic_ray_rate: bank[0],
+        }
+    }
+
     pub fn load_input(&mut self, data: &[u8]) {
         self.private_banks.write_input(data);
     }

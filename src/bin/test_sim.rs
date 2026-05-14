@@ -27,7 +27,8 @@ fn main() -> anyhow::Result<()> {
     println!("--- Initializing Random Multiverse ---");
 
     // Create a multiverse with 2 communities, 5 agents each, 100 energy start
-    let mut multiverse = Multiverse::new_random(2, 5, 10.0);
+    let rng = &mut rand::rng();
+    let mut multiverse = Multiverse::new_random(rng, 2, 5, 10.0);
 
     // Pick one agent to be "Smart" manually for testing the task
     let smart_id = AgentId(0);
@@ -56,9 +57,11 @@ fn main() -> anyhow::Result<()> {
 
     println!("\n--- Starting Simulation Loop ---");
 
+    let rng = &mut rand::rng();
+
     for generation in 0..21 {
         // Run one tick with 1000 total energy budget
-        runner.run_population_tick(&mut multiverse, &task, 1000.0, 100);
+        runner.run_population_tick(rng, &mut multiverse, &task, 1000.0, 100);
 
         let survivor_count = multiverse.survivor_count();
 
@@ -66,12 +69,16 @@ fn main() -> anyhow::Result<()> {
         if let Ok(sess) = smart_sess {
             let energy = sess.agent.get_energy();
             let output = sess.agent.collect_output();
-            println!("Gen {:02}: Smart Agent Energy: {:.2}, Output: {:?}, Survivors: {}", 
-                     generation, energy, output, survivor_count);
+            println!(
+                "Gen {:02}: Smart Agent Energy: {:.2}, Output: {:?}, Survivors: {}",
+                generation, energy, output, survivor_count
+            );
         } else {
-            println!("Gen {:02}: Smart Agent DIED, Survivors: {}", generation, survivor_count);
+            println!(
+                "Gen {:02}: Smart Agent DIED, Survivors: {}",
+                generation, survivor_count
+            );
         }
-
 
         if generation % 10 == 0 {
             let save_path = format!("checkpoints/gen_{}", generation);

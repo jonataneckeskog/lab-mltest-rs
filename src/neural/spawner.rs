@@ -1,48 +1,47 @@
 use ordered_float::OrderedFloat;
-use rand::Rng;
 use std::sync::Arc;
 
-use crate::neural::{Agent, genome::Genome, memory::PrivateBanks};
+use crate::neural::{Agent, config::MutationSettings, genome::Genome};
 
 pub struct AgentSpawner {
     pub spawn_energy: f32,
 }
 
 impl AgentSpawner {
-    pub fn new_random(&self) -> Agent {
-        let mut rng = rand::rng();
+    pub fn new_random(&self, rng: &mut impl rand::Rng) -> Agent {
         let mut data = vec![0u8; 64];
         rng.fill_bytes(&mut data[..32]);
 
         let base_genome = Genome(Arc::new(data.clone()));
 
-        Agent {
-            base_genome,
-            genome: data,
-            energy: OrderedFloat(self.spawn_energy),
-            private_banks: PrivateBanks::default(),
-        }
+        let mut agent = Agent::default();
+        agent.base_genome = base_genome;
+        agent.genome = data;
+        agent.energy = OrderedFloat(self.spawn_energy);
+        agent.set_mutation_settings(MutationSettings::new_random(rng));
+        agent
     }
 
-    pub fn spawn_standard(&self, parent_blueprint: Genome) -> Agent {
-        let active_code = (*parent_blueprint.0).clone();
+    pub fn spawn_standard(&self, parent: &Agent) -> Agent {
+        let active_code = parent.genome.clone();
+        let base_genome = parent.base_genome.clone();
 
-        Agent {
-            base_genome: parent_blueprint,
-            genome: active_code,
-            energy: OrderedFloat(self.spawn_energy),
-            private_banks: PrivateBanks::default(),
-        }
+        let mut child = Agent::default();
+        child.base_genome = base_genome;
+        child.genome = active_code;
+        child.energy = OrderedFloat(self.spawn_energy);
+        child.set_mutation_settings(parent.get_mutation_settings());
+        child
     }
 
     pub fn spawn_from_data(blueprint_data: Vec<u8>, energy: f32) -> Agent {
         let base_genome = Genome(Arc::new(blueprint_data.clone()));
 
-        Agent {
-            base_genome,
-            genome: blueprint_data,
-            energy: OrderedFloat(energy),
-            private_banks: PrivateBanks::default(),
-        }
+        let mut agent = Agent::default();
+        agent.base_genome = base_genome;
+        agent.genome = blueprint_data;
+        agent.energy = OrderedFloat(energy);
+        agent.set_mutation_settings(MutationSettings::default());
+        agent
     }
 }

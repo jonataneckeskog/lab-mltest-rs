@@ -1,4 +1,25 @@
 use crate::vm::op;
+use rand::RngExt;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct MutationSettings {
+    pub cosmic_ray_rate: u8,
+}
+
+impl Default for MutationSettings {
+    fn default() -> Self {
+        Self { cosmic_ray_rate: 0 }
+    }
+}
+
+impl MutationSettings {
+    pub fn new_random(rng: &mut impl rand::Rng) -> Self {
+        Self {
+            cosmic_ray_rate: rng.random(),
+        }
+    }
+}
 
 macro_rules! define_costs {
     (default: $default:expr, { $($op:expr => $cost:expr),* $(,)? }) => {{

@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use crate::{
     neural::{Agent, AgentId, AgentSpawner, SharedBanks},
     sim::engine::SimulationEvent,
     sim::runner::AgentSession,
     sim::storage::CommunityId,
 };
+use std::collections::HashMap;
 
 pub struct Multiverse {
     pub(crate) spaces: HashMap<CommunityId, Community>,
@@ -25,6 +24,7 @@ impl Multiverse {
 
     /// Create a randomly initialized multiverse with X communities and N agents per community.
     pub fn new_random(
+        rng: &mut impl rand::Rng,
         num_communities: usize,
         agents_per_community: usize,
         spawn_energy: f32,
@@ -35,7 +35,7 @@ impl Multiverse {
         for i in 0..num_communities {
             let mut community = Community::new();
             for _ in 0..agents_per_community {
-                community.add_agent(spawner.new_random());
+                community.add_agent(spawner.new_random(rng));
             }
             multiverse.add_community(CommunityId(i), community);
         }
@@ -109,10 +109,10 @@ impl Multiverse {
 
                         if can_spawn {
                             let parent = comm.agents.get(&parent_id).unwrap();
-                            let mut child = Agent::default();
-                            child.genome = parent.genome.clone();
-                            child.base_genome = parent.base_genome.clone();
-                            child.energy = ordered_float::OrderedFloat(energy);
+                            let spawner = AgentSpawner {
+                                spawn_energy: energy,
+                            };
+                            let child = spawner.spawn_standard(parent);
 
                             // Deduct energy from parent
                             comm.agents.get_mut(&parent_id).unwrap().energy.0 -= energy;
@@ -247,7 +247,8 @@ mod tests {
         // Budget = 100.
         // a1 (score 10) -> 10/40 * 100 = 25
         // a2 (score 30) -> 30/40 * 100 = 75
-        runner.run_population_tick(&mut multiverse, &MockTask, 100.0, 0);
+        let rng = &mut rand::rng();
+        runner.run_population_tick(rng, &mut multiverse, &MockTask, 100.0, 0);
 
         let comm_ref = multiverse.spaces.get(&CommunityId(1)).unwrap();
 
