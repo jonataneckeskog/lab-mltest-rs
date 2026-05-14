@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use crate::neural::{Agent, SharedBanks};
+use crate::{
+    neural::{Agent, AgentId, SharedBanks},
+    sim::storage::CommunityId,
+};
 
 pub struct Multiverse {
-    pub(crate) spaces: HashMap<usize, Community>,
+    pub(crate) spaces: HashMap<CommunityId, Community>,
 }
 
 pub struct Community {
-    pub(crate) agents: Vec<Agent>,
+    pub(crate) agents: HashMap<AgentId, Agent>,
     pub(crate) shared_comms: SharedBanks,
 }
 
@@ -18,7 +21,7 @@ impl Multiverse {
         }
     }
 
-    pub fn add_community(&mut self, id: usize, community: Community) {
+    pub fn add_community(&mut self, id: CommunityId, community: Community) {
         self.spaces.insert(id, community);
     }
 
@@ -47,22 +50,23 @@ impl Multiverse {
 
     pub fn migrate_agent(
         &mut self,
-        from_id: usize,
-        to_id: usize,
-        agent_index: usize,
+        from_id: CommunityId,
+        to_id: CommunityId,
+        agent_id: AgentId,
     ) -> anyhow::Result<()> {
         let agent = self
             .spaces
             .get_mut(&from_id)
             .ok_or_else(|| anyhow::anyhow!("Source community not found"))?
             .agents
-            .remove(agent_index);
+            .remove(&agent_id)
+            .ok_or_else(|| anyhow::anyhow!("Agent not found in source community"))?;
 
         self.spaces
             .get_mut(&to_id)
             .ok_or_else(|| anyhow::anyhow!("Destination community not found"))?
             .agents
-            .push(agent);
+            .insert(agent_id, agent);
 
         Ok(())
     }
@@ -71,12 +75,46 @@ impl Multiverse {
 impl Community {
     pub fn new() -> Self {
         Community {
-            agents: Vec::new(),
+            agents: HashMap::new(),
             shared_comms: SharedBanks::default(),
         }
     }
 
-    pub fn add_agent(&mut self, agent: Agent) {
-        self.agents.push(agent);
+    pub fn add_agent(&mut self, agent: Agent) -> AgentId {
+        let mut candidate = AgentId(0);
+        while self.agents.contains_key(&candidate) {
+            candidate.0 += 1;
+        }
+        self.agents.insert(candidate, agent);
+        candidate
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neural::Agent;
+
+    #[test]
+    fn test_add_agent_assigns_zero_for_empty_community() {
+        let mut community = Community::new();
+        let id = community.add_agent(Agent::default());
+
+        assert_eq!(id, AgentId(0));
+        assert!(community.agents.contains_key(&id));
+        assert_eq!(community.agents.len(), 1);
+    }
+
+    #[test]
+    fn test_add_agent_uses_nonexistent_id_when_gap_exists() {
+        let mut community = Community::new();
+        community.agents.insert(AgentId(0), Agent::default());
+        community.agents.insert(AgentId(2), Agent::default());
+
+        let id = community.add_agent(Agent::default());
+
+        assert_eq!(id, AgentId(1));
+        assert!(community.agents.contains_key(&id));
+        assert_eq!(community.agents.len(), 3);
     }
 }

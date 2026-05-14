@@ -4,11 +4,14 @@ use std::{collections::HashMap, path::Path};
 use super::multiverse::{Community, Multiverse};
 use crate::neural::{AgentManifest, BankManifest, SharedBanks};
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CommunityId(pub usize);
+
 #[derive(Serialize, Deserialize)]
 pub struct CommunityManifest {
     pub agents: Vec<AgentManifest>,
     pub shared_banks: BankManifest,
-    pub id: usize,
+    pub id: CommunityId,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -17,15 +20,14 @@ pub struct MultiverseManifest {
 }
 
 impl Community {
-    pub fn save(&self, id: usize, folder: &Path) -> std::io::Result<CommunityManifest> {
+    pub fn save(&self, id: CommunityId, folder: &Path) -> std::io::Result<CommunityManifest> {
         let agents: Vec<AgentManifest> = self
             .agents
             .iter()
-            .enumerate()
-            .map(|(id, agent)| agent.save(&id.to_string(), folder))
+            .map(|(id, agent)| agent.save(*id, folder))
             .collect::<std::io::Result<Vec<_>>>()?;
 
-        let shared_banks = self.shared_comms.save(&id.to_string(), folder)?;
+        let shared_banks = self.shared_comms.save(id.0, folder)?;
 
         Ok(CommunityManifest {
             agents,
@@ -37,11 +39,15 @@ impl Community {
 
 impl CommunityManifest {
     pub fn load(&self, folder: &Path) -> anyhow::Result<Community> {
-        let agents = self
+        let agents: HashMap<crate::neural::AgentId, crate::neural::Agent> = self
             .agents
             .iter()
-            .map(|agent_manifest| agent_manifest.load(folder))
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .map(|agent_manifest| {
+                agent_manifest
+                    .load(folder)
+                    .map(|agent| (agent_manifest.id, agent))
+            })
+            .collect::<anyhow::Result<HashMap<_, _>>>()?;
 
         let shared_comms: SharedBanks = self.shared_banks.load(folder)?;
 
@@ -82,7 +88,7 @@ impl MultiverseManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neural::{Agent, SharedBanks};
+    use crate::neural::{Agent, AgentId, SharedBanks};
     use ordered_float::OrderedFloat;
     use tempfile::tempdir;
 
@@ -96,7 +102,9 @@ mod tests {
 
     // Helper to create a basic community for testing
     fn create_test_community() -> Community {
-        let agents = vec![create_test_agent(), create_test_agent()];
+        let mut agents = HashMap::new();
+        agents.insert(AgentId(0), create_test_agent());
+        agents.insert(AgentId(1), create_test_agent());
         let shared_comms = SharedBanks::default();
         Community {
             agents,
@@ -109,7 +117,7 @@ mod tests {
         let dir = tempdir()?;
         let community = create_test_community();
 
-        community.save(42, dir.path())?;
+        community.save(CommunityId(42), dir.path())?;
 
         // Check that agent files are created
         assert!(dir.path().join("genome_0.bin").exists());
@@ -126,11 +134,15 @@ mod tests {
         let dir = tempdir()?;
         let original = create_test_community();
 
-        let manifest = original.save(99, dir.path())?;
+        let manifest = original.save(CommunityId(99), dir.path())?;
         let recovered = manifest.load(dir.path())?;
 
         assert_eq!(original.agents.len(), recovered.agents.len());
-        for (orig, rec) in original.agents.iter().zip(recovered.agents.iter()) {
+        for (id, orig) in &original.agents {
+            let rec = recovered
+                .agents
+                .get(id)
+                .expect("Recovered community missing agent");
             assert_eq!(orig.genome, rec.genome);
             assert_eq!(orig.energy, rec.energy);
             assert_eq!(orig.private_banks, rec.private_banks);
@@ -145,8 +157,12 @@ mod tests {
         let mut multiverse = Multiverse {
             spaces: HashMap::new(),
         };
-        multiverse.spaces.insert(1, create_test_community());
-        multiverse.spaces.insert(2, create_test_community());
+        multiverse
+            .spaces
+            .insert(CommunityId(1), create_test_community());
+        multiverse
+            .spaces
+            .insert(CommunityId(2), create_test_community());
 
         let manifest = multiverse.save(dir.path())?;
         let loaded = manifest.load(dir.path())?;
@@ -185,18 +201,19 @@ mod tests {
                     raw_data_path: std::path::PathBuf::from("b.bin"),
                     bank_count: 6,
                 },
+                id: AgentId(1),
             }],
             shared_banks: BankManifest {
                 raw_data_path: std::path::PathBuf::from("s.bin"),
                 bank_count: 2,
             },
-            id: 5,
+            id: CommunityId(5),
         };
 
         let encoded = bincode::serialize(&manifest)?;
         let decoded: CommunityManifest = bincode::deserialize(&encoded)?;
 
-        assert_eq!(decoded.id, 5);
+        assert_eq!(decoded.id, CommunityId(5));
         assert_eq!(decoded.agents.len(), 1);
         assert_eq!(decoded.shared_banks.bank_count, 2);
         Ok(())

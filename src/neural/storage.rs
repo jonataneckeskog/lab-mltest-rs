@@ -7,12 +7,16 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AgentId(pub usize);
+
 #[derive(Serialize, Deserialize)]
 pub struct AgentManifest {
     pub energy: f32,
     pub base_genome_path: PathBuf,
     pub genome_path: PathBuf,
     pub banks: BankManifest,
+    pub id: AgentId,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -25,7 +29,7 @@ impl<const N: usize> Bank<N>
 where
     Self: BankMetadata,
 {
-    pub fn save(&self, id: &str, folder: &Path) -> std::io::Result<BankManifest> {
+    pub fn save(&self, id: usize, folder: &Path) -> std::io::Result<BankManifest> {
         let filename = format!("{}_{}.bin", Self::PREFIX, id);
         // ... identical serialization logic as above ...
         let path = folder.join(&filename);
@@ -59,21 +63,22 @@ impl BankManifest {
 }
 
 impl Agent {
-    pub fn save(&self, id: &str, folder: &Path) -> std::io::Result<AgentManifest> {
-        let genome_filename = format!("genome_{}.bin", id);
-        let base_genome_filename = format!("base_genome_{}.bin", id);
+    pub fn save(&self, id: AgentId, folder: &Path) -> std::io::Result<AgentManifest> {
+        let genome_filename = format!("genome_{}.bin", id.0);
+        let base_genome_filename = format!("base_genome_{}.bin", id.0);
         std::fs::write(folder.join(&genome_filename), &self.genome)?;
         std::fs::write(
             folder.join(&base_genome_filename),
             self.base_genome.0.as_ref(),
         )?;
-        let bank_manifest = self.private_banks.save(id, folder)?;
+        let bank_manifest = self.private_banks.save(id.0, folder)?;
 
         Ok(AgentManifest {
             energy: self.energy.0,
             genome_path: PathBuf::from(genome_filename),
             base_genome_path: PathBuf::from(base_genome_filename),
             banks: bank_manifest,
+            id: id,
         })
     }
 }
@@ -113,7 +118,7 @@ mod tests {
         let dir = tempdir()?;
         let banks = PrivateBanks::default();
 
-        let manifest = banks.save("alpha", dir.path())?;
+        let manifest = banks.save(0, dir.path())?;
         let loaded_banks: PrivateBanks = manifest.load(dir.path())?;
 
         assert_eq!(banks, loaded_banks);
@@ -124,7 +129,7 @@ mod tests {
     fn test_bank_count_mismatch_fails() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let private = PrivateBanks::default();
-        let manifest = private.save("beta", dir.path())?;
+        let manifest = private.save(1, dir.path())?;
 
         // Try to load 6 banks into a struct expecting 2 (SharedBanks)
         let result = manifest.load::<2>(dir.path());
@@ -138,7 +143,7 @@ mod tests {
         let mut banks = PrivateBanks::default();
         banks.write_input(&[10, 20, 30]);
 
-        let manifest = banks.save("io_test", dir.path())?;
+        let manifest = banks.save(2, dir.path())?;
         let loaded = manifest.load::<6>(dir.path())?;
 
         assert_eq!(loaded.read_output(), Vec::<u8>::new()); // Output bank should still be empty
@@ -152,10 +157,10 @@ mod tests {
         let dir = tempdir()?;
         let agent = create_test_agent();
 
-        agent.save("001", dir.path())?;
+        agent.save(AgentId(1), dir.path())?;
 
-        assert!(dir.path().join("genome_001.bin").exists());
-        assert!(dir.path().join("private_banks_001.bin").exists());
+        assert!(dir.path().join("genome_1.bin").exists());
+        assert!(dir.path().join("private_banks_1.bin").exists());
         Ok(())
     }
 
@@ -164,7 +169,7 @@ mod tests {
         let dir = tempdir()?;
         let original = create_test_agent();
 
-        let manifest = original.save("rt", dir.path())?;
+        let manifest = original.save(AgentId(1), dir.path())?;
         let recovered = manifest.load(dir.path())?;
 
         assert_eq!(original.genome, recovered.genome);
@@ -184,6 +189,7 @@ mod tests {
                 raw_data_path: PathBuf::from("b.bin"),
                 bank_count: 6,
             },
+            id: AgentId(1),
         };
 
         let encoded = bincode::serialize(&manifest)?;
@@ -197,7 +203,7 @@ mod tests {
     #[test]
     fn test_save_with_nonexistent_folder_fails() {
         let agent = create_test_agent();
-        let result = agent.save("fail", Path::new("/definitely/not/a/real/path"));
+        let result = agent.save(AgentId(0), Path::new("/definitely/not/a/real/path"));
         assert!(result.is_err());
     }
 
@@ -207,7 +213,7 @@ mod tests {
         let mut banks = PrivateBanks::default();
         banks.raw_mut(2)[10] = 255; // Modify the 3rd bank
 
-        let manifest = banks.save("raw", dir.path())?;
+        let manifest = banks.save(3, dir.path())?;
         let loaded = manifest.load::<6>(dir.path())?;
 
         assert_eq!(loaded.0[2][10], 255);
@@ -219,9 +225,9 @@ mod tests {
         let dir = tempdir()?;
         let shared = SharedBanks::default();
 
-        let manifest = shared.save("global", dir.path())?;
+        let manifest = shared.save(0, dir.path())?;
         assert_eq!(manifest.bank_count, 2);
-        assert!(dir.path().join("shared_banks_global.bin").exists());
+        assert!(dir.path().join("shared_banks_0.bin").exists());
         Ok(())
     }
 
@@ -231,7 +237,7 @@ mod tests {
         let mut agent = Agent::default();
         agent.genome = vec![0u8; 1024 * 10]; // 10kb genome
 
-        let manifest = agent.save("big", dir.path())?;
+        let manifest = agent.save(AgentId(1), dir.path())?;
         let recovered = manifest.load(dir.path())?;
 
         assert_eq!(recovered.genome.len(), 1024 * 10);
