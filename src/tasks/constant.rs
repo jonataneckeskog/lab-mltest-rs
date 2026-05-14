@@ -1,4 +1,4 @@
-use crate::sim::SingleStepTask;
+use crate::core::SingleStepTask;
 
 pub struct ConstantTask {
     pub target: u8,

@@ -1,9 +1,9 @@
 use crate::{
+    core::{MultiStepTask, SingleStepTask},
     neural::{Agent, AgentId, AgentVmMemory, SharedBanks},
     sim::{
         engine::{SimulationContext, SimulationEvent},
         storage::CommunityId,
-        task::{MultiStepTask, SingleStepTask},
     },
     vm::{AgentExecutor, TerminationReason},
 };

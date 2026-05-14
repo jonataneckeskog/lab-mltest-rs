@@ -1,7 +1,8 @@
+use crate::core::SingleStepTask;
+use crate::evolution::hooks::{CheckpointHook, PopulationTargetHook, PrintStatsHook};
 use crate::evolution::{EvolutionConfig, EvolutionEngine, EvolutionHook};
-use crate::evolution::hooks::{PrintStatsHook, PopulationTargetHook, CheckpointHook};
-use crate::sim::{Multiverse, SingleStepTask};
 use crate::neural::AgentSpawner;
+use crate::sim::Multiverse;
 use std::path::PathBuf;
 
 /// Creates a standard simulation setup for testing tasks.

@@ -1,3 +1,4 @@
+mod core;
 pub mod evolution;
 pub mod functions;
 pub mod neural;

@@ -1,9 +1,9 @@
-use crate::sim::Multiverse;
-use crate::sim::SingleStepTask;
-use crate::sim::SimulationRunner;
+use crate::core::SingleStepTask;
 use crate::neural::AgentSpawner;
-use crate::vm::AgentExecutor;
 use crate::neural::config::OP_COSTS;
+use crate::sim::Multiverse;
+use crate::sim::SimulationRunner;
+use crate::vm::AgentExecutor;
 
 pub struct EvolutionConfig {
     pub communities: usize,
@@ -34,8 +34,9 @@ impl<T: EvolutionHook> EvolutionHook for &mut T {
 
 impl EvolutionHook for Vec<Box<dyn EvolutionHook>> {
     fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
-        self.iter_mut()
-            .fold(true, |acc, hook| hook.on_generation_complete(generation, multiverse) && acc)
+        self.iter_mut().fold(true, |acc, hook| {
+            hook.on_generation_complete(generation, multiverse) && acc
+        })
     }
 }
 
@@ -56,7 +57,11 @@ impl<'a> EvolutionEngine<'a> {
         }
     }
 
-    pub fn run<H: EvolutionHook>(&mut self, rng: &mut impl rand::Rng, mut hook: H) -> anyhow::Result<()> {
+    pub fn run<H: EvolutionHook>(
+        &mut self,
+        rng: &mut impl rand::Rng,
+        mut hook: H,
+    ) -> anyhow::Result<()> {
         let runner = SimulationRunner::new(&self.executor);
 
         for generation in 0..=self.config.max_generations {
