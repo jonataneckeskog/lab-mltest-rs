@@ -53,7 +53,7 @@ impl VmContext for SimulationContext {
                 let target_id = stack.pop();
                 self.events.push(SimulationEvent::LeaveCommunity {
                     agent_id: self.agent_id,
-                    target_community_id: CommunityId(target_id as usize),
+                    target_community_id: CommunityId(target_id as u64),
                 });
                 true
             }

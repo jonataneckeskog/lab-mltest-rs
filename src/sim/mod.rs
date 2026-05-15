@@ -1,7 +1,7 @@
-mod engine;
-mod multiverse;
-mod runner;
+pub mod core;
+pub mod runner;
+pub mod state;
 
-pub use engine::{SimulationContext, SimulationEvent};
-pub use multiverse::{Community, Multiverse};
+pub use core::{SimulationContext, SimulationEvent, resolve_events};
 pub use runner::{AgentSession, SimulationRunner};
+pub use state::{Community, Multiverse};

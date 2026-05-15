@@ -74,7 +74,7 @@ impl<'a> EvolutionEngine<'a> {
                 || self.spawner.new_random(rng),
             );
 
-            self.multiverse.mutate_all(rng);
+            crate::sim::core::mutate_all(&mut self.multiverse, rng);
 
             let should_continue = hook.on_generation_complete(generation, &self.multiverse);
 

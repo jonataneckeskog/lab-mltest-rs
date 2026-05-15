@@ -1,6 +1,6 @@
 use crate::core::{AgentId, CommunityId};
 use crate::neural::{Agent, SharedBanks};
-use crate::sim::{Community, Multiverse};
+use crate::sim::state::{Community, Multiverse};
 use crate::storage::agent::{AgentManifest, BankManifest};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
@@ -16,6 +16,7 @@ pub struct CommunityManifest {
 pub struct MultiverseManifest {
     pub communities: Vec<CommunityManifest>,
     pub population: usize,
+    pub next_agent_id: u64,
 }
 
 impl Community {
@@ -92,6 +93,7 @@ impl Multiverse {
         Ok(MultiverseManifest {
             communities,
             population: self.population,
+            next_agent_id: self.next_agent_id,
         })
     }
 }
@@ -100,12 +102,23 @@ impl MultiverseManifest {
     pub fn load(&self, folder: &Path) -> anyhow::Result<Multiverse> {
         let mut spaces = HashMap::new();
         let mut population = 0;
+        let mut agent_locations = HashMap::new();
+        
         for community_manifest in &self.communities {
             let community = community_manifest.load(folder)?;
+            for agent_id in community.agents.keys() {
+                agent_locations.insert(*agent_id, community_manifest.id);
+            }
             population += community.agents.len();
             spaces.insert(community_manifest.id, community);
         }
-        Ok(Multiverse { spaces, population })
+        
+        Ok(Multiverse { 
+            spaces, 
+            population,
+            agent_locations,
+            next_agent_id: self.next_agent_id,
+        })
     }
 }
 
@@ -128,6 +141,7 @@ mod tests {
     // Helper to create a basic community for testing
     fn create_test_community() -> Community {
         let mut agents = HashMap::new();
+        // Note: IDs in community map must be consistent with Multiverse logic
         agents.insert(AgentId(0), create_test_agent());
         agents.insert(AgentId(1), create_test_agent());
         let shared_comms = SharedBanks::default();
@@ -182,6 +196,8 @@ mod tests {
         let mut multiverse = Multiverse {
             spaces: HashMap::new(),
             population: 0,
+            agent_locations: HashMap::new(),
+            next_agent_id: 100,
         };
         multiverse
             .spaces
@@ -189,11 +205,19 @@ mod tests {
         multiverse
             .spaces
             .insert(CommunityId(2), create_test_community());
+        
+        // Re-sync locations for test
+        for (cid, community) in &multiverse.spaces {
+            for aid in community.agents.keys() {
+                multiverse.agent_locations.insert(*aid, *cid);
+            }
+        }
 
         let manifest = multiverse.save(dir.path())?;
         let loaded = manifest.load(dir.path())?;
 
         assert_eq!(multiverse.spaces.len(), loaded.spaces.len());
+        assert_eq!(multiverse.next_agent_id, loaded.next_agent_id);
         for (id, orig_comm) in &multiverse.spaces {
             let loaded_comm = loaded.spaces.get(id).unwrap();
             assert_eq!(orig_comm.agents.len(), loaded_comm.agents.len());
@@ -208,6 +232,8 @@ mod tests {
         let multiverse = Multiverse {
             spaces: HashMap::new(),
             population: 0,
+            agent_locations: HashMap::new(),
+            next_agent_id: 0,
         };
 
         let manifest = multiverse.save(dir.path())?;
@@ -225,6 +251,10 @@ mod tests {
         multiverse
             .spaces
             .insert(CommunityId(1), create_test_community());
+        // Sync locations
+        for aid in multiverse.spaces.get(&CommunityId(1)).unwrap().agents.keys() {
+            multiverse.agent_locations.insert(*aid, CommunityId(1));
+        }
 
         multiverse.save_to(dir.path())?;
         let loaded = Multiverse::load_from(dir.path())?;

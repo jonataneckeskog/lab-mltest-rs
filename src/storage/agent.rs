@@ -1,7 +1,7 @@
 use crate::core::AgentId;
 use crate::neural::{
-    agent::Agent,
     GeneticBlueprint,
+    agent::Agent,
     memory::{Bank, BankMetadata},
 };
 use ordered_float::OrderedFloat;
@@ -29,7 +29,7 @@ impl<const N: usize> Bank<N>
 where
     Self: BankMetadata,
 {
-    pub fn save(&self, id: usize, folder: &Path) -> std::io::Result<BankManifest> {
+    pub fn save(&self, id: u64, folder: &Path) -> std::io::Result<BankManifest> {
         let filename = format!("{}_{}.bin", Self::PREFIX, id);
         let path = folder.join(&filename);
         let bytes = bincode::serialize(self)
@@ -65,15 +65,15 @@ impl Agent {
     pub fn save(&self, id: AgentId, folder: &Path) -> std::io::Result<AgentManifest> {
         let genome_filename = format!("genome_{}.bin", id.0);
         let blueprint_filename = format!("blueprint_{}.bin", id.0);
-        
+
         // Save current working genome
         std::fs::write(folder.join(&genome_filename), &self.genome)?;
-        
+
         // Save the entire blueprint (lineage)
         let blueprint_bytes = bincode::serialize(self.blueprint.as_ref())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         std::fs::write(folder.join(&blueprint_filename), blueprint_bytes)?;
-        
+
         let bank_manifest = self.private_banks.save(id.0, folder)?;
 
         Ok(AgentManifest {
