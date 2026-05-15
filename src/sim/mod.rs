@@ -1,11 +1,7 @@
-mod multiverse;
-mod storage;
-mod engine;
-mod task;
-mod runner;
+pub mod core;
+pub mod runner;
+pub mod state;
 
-pub use multiverse::{Community, Multiverse};
-pub use storage::{CommunityId, CommunityManifest, MultiverseManifest};
-pub use engine::{SimulationContext, SimulationEvent};
-pub use task::{SingleStepTask, MultiStepTask};
+pub use core::{SimulationContext, SimulationEvent, resolve_events};
 pub use runner::{AgentSession, SimulationRunner};
+pub use state::{Community, Multiverse};

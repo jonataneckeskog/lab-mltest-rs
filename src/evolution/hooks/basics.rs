@@ -1,6 +1,21 @@
-use std::path::PathBuf;
-use crate::sim::Multiverse;
 use crate::evolution::EvolutionHook;
+use crate::sim::Multiverse;
+use std::path::PathBuf;
+
+pub struct PopulationBalancerHook {
+    pub min_population: usize,
+    pub refill_fn: Box<dyn FnMut() -> crate::neural::Agent>,
+    pub rng: Box<dyn rand::Rng>,
+}
+
+impl EvolutionHook for PopulationBalancerHook {
+    fn on_generation_complete(&mut self, _generation: usize, multiverse: &mut Multiverse) -> bool {
+        while multiverse.population < self.min_population {
+            multiverse.add_agent_to_random_community(&mut self.rng, (self.refill_fn)());
+        }
+        true
+    }
+}
 
 pub struct CheckpointHook {
     pub interval: usize,
@@ -8,7 +23,7 @@ pub struct CheckpointHook {
 }
 
 impl EvolutionHook for CheckpointHook {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
         if generation > 0 && generation % self.interval == 0 {
             let path = self.dir.join(format!("gen_{}.checkpoint", generation));
             let _ = multiverse.save_to(&path);
@@ -23,8 +38,8 @@ pub struct PrintStatsHook {
 }
 
 impl EvolutionHook for PrintStatsHook {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
-        let survivor_count = multiverse.survivor_count();
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
+        let survivor_count = multiverse.population;
         let (_min_e, max_e, avg_e) = multiverse.get_energy_stats();
 
         if generation % self.interval == 0 || survivor_count > self.highest_survivors {
@@ -48,8 +63,8 @@ pub struct PopulationTargetHook {
 }
 
 impl EvolutionHook for PopulationTargetHook {
-    fn on_generation_complete(&mut self, _generation: usize, multiverse: &Multiverse) -> bool {
-        let survivor_count = multiverse.survivor_count();
+    fn on_generation_complete(&mut self, _generation: usize, multiverse: &mut Multiverse) -> bool {
+        let survivor_count = multiverse.population;
         if survivor_count >= self.target {
             println!("🎯 Convergence reached ({} survivors)!", survivor_count);
             return false;

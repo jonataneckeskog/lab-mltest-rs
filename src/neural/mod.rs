@@ -1,13 +1,11 @@
 pub mod agent;
 pub mod genome;
 pub mod memory;
-pub mod config;
+mod mutation;
 pub mod spawner;
-pub mod storage;
 
 pub use agent::{Agent, AgentVmMemory};
-pub use genome::Genome;
+pub use genome::GeneticBlueprint;
 pub use memory::SharedBanks;
-pub use config::OP_COSTS;
+pub use mutation::MutationSettings;
 pub use spawner::AgentSpawner;
-pub use storage::{AgentId, AgentManifest, BankManifest};

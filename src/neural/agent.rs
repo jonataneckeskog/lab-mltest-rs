@@ -1,43 +1,50 @@
-use crate::neural::{
-    config::MutationSettings,
-    genome::Genome,
-    memory::{PrivateBanks, SharedBanks},
+use crate::{
+    neural::{
+        MutationSettings,
+        genome::GeneticBlueprint,
+        memory::{PrivateBanks, SharedBanks},
+    },
+    vm::VmMemory,
 };
-use crate::vm::traits::VmMemory;
 use ordered_float::OrderedFloat;
+use rand::RngExt;
+use std::sync::Arc;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct Agent {
-    pub(crate) base_genome: Genome,
-    pub(crate) genome: Vec<u8>,
-    pub(crate) private_banks: PrivateBanks,
-    pub(crate) energy: OrderedFloat<f32>,
+    /// The shared, immutable lineage (cheap clone via Arc).
+    pub blueprint: Arc<GeneticBlueprint>,
+
+    /// Mutable runtime state.
+    pub genome: Vec<u8>, // Working, mutable copy of the sequence
+    pub private_banks: PrivateBanks,
+    pub energy: OrderedFloat<f32>,
     pub age: u64,
 }
 
 impl Default for Agent {
     fn default() -> Self {
-        Agent {
-            base_genome: Genome::default(),
+        let blueprint = Arc::new(GeneticBlueprint::default());
+        let mut agent = Agent {
+            blueprint,
             genome: Vec::with_capacity(32),
             private_banks: PrivateBanks::default(),
             energy: OrderedFloat(0.0),
             age: 0,
-        }
+        };
+        agent.reset(0.0);
+        agent
     }
 }
 
 impl Agent {
-    pub fn set_mutation_settings(&mut self, settings: MutationSettings) {
-        let bank = self.private_banks.raw_mut(5);
-        bank[0] = settings.cosmic_ray_rate;
-    }
-
-    pub fn get_mutation_settings(&self) -> MutationSettings {
-        let bank = &self.private_banks.0[5];
-        MutationSettings {
-            cosmic_ray_rate: bank[0],
-        }
+    /// Synchronizes the runtime state with the genetic blueprint.
+    pub fn reset(&mut self, energy: f32) {
+        self.genome = self.blueprint.original_sequence.clone();
+        self.private_banks = PrivateBanks::default();
+        self.set_mutation_settings(self.blueprint.mutation_settings);
+        self.energy = OrderedFloat(energy);
+        self.age = 0;
     }
 
     pub fn load_input(&mut self, data: &[u8]) {
@@ -48,20 +55,51 @@ impl Agent {
         self.private_banks.read_output()
     }
 
-    pub fn get_energy(&self) -> f32 {
-        self.energy.0
+    pub fn mutate(&mut self, rng: &mut impl rand::Rng) {
+        let settings = self.get_mutation_settings();
+        if settings.cosmic_ray_rate == 0 {
+            return;
+        }
+
+        // Probability of a bit flip per bit.
+        let prob = (settings.cosmic_ray_rate as f64) / (255.0 * 100.0);
+        let total_bits = self.genome.len() * 8;
+
+        let log_q = (1.0 - prob).ln();
+        let mut bit_idx = 0;
+
+        while bit_idx < total_bits {
+            let u: f64 = rng.random();
+
+            let u_bits = u.to_bits();
+            let exponent = ((u_bits >> 52) & 0x7FF) as i32 - 1023;
+            let mantissa_fraction = (u_bits & 0xF_FFFF_FFFF_FFFF) as f64 / 4503599627370496.0;
+
+            let approx_ln_u = (exponent as f64 * 0.69314718) + mantissa_fraction;
+
+            let jump = (approx_ln_u / log_q).floor() as usize;
+            bit_idx += jump + 1;
+
+            if bit_idx < total_bits {
+                let byte_idx = bit_idx / 8;
+                let bit_in_byte = bit_idx % 8;
+                if let Some(byte) = self.genome.get_mut(byte_idx) {
+                    *byte ^= 1 << bit_in_byte;
+                }
+            }
+        }
     }
 
-    pub fn set_energy(&mut self, val: f32) {
-        self.energy.0 = val;
+    pub fn get_mutation_settings(&self) -> MutationSettings {
+        let bank = &self.private_banks.0[5];
+        MutationSettings {
+            cosmic_ray_rate: bank[0],
+        }
     }
 
-    pub fn set_genome(&mut self, genome: Vec<u8>) {
-        self.genome = genome;
-    }
-
-    pub fn get_genome(&self) -> &[u8] {
-        &self.genome
+    pub fn set_mutation_settings(&mut self, settings: MutationSettings) {
+        let bank = self.private_banks.raw_mut(5);
+        bank[0] = settings.cosmic_ray_rate;
     }
 }
 
@@ -96,9 +134,9 @@ impl<'a> VmMemory for AgentVmMemory<'a> {
         self.agent.genome.get(pc).copied().unwrap_or(0)
     }
 
-    fn write_genome(&mut self, pc: usize, val: u8) {
+    fn write_genome(&mut self, pc: usize, u: u8) {
         if let Some(byte) = self.agent.genome.get_mut(pc) {
-            *byte = val;
+            *byte = u;
         }
     }
 

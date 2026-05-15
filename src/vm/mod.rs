@@ -1,9 +1,11 @@
-pub mod executor;
-pub mod isa;
-pub mod stack;
-pub mod traits;
+mod executor;
+mod isa;
+mod presets;
+mod stack;
+mod traits;
 
-pub use executor::{AgentExecutor, ExecutionSummary, TerminationReason};
+pub use executor::{AgentExecutor, TerminationReason};
 pub use isa::op;
+pub use presets::OP_COSTS;
 pub use stack::ByteStack;
 pub use traits::{VmContext, VmMemory};

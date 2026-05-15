@@ -1,9 +1,8 @@
+use crate::core::SingleStepTask;
 use crate::sim::Multiverse;
-use crate::sim::SingleStepTask;
 use crate::sim::SimulationRunner;
-use crate::neural::AgentSpawner;
 use crate::vm::AgentExecutor;
-use crate::neural::config::OP_COSTS;
+use crate::vm::OP_COSTS;
 
 pub struct EvolutionConfig {
     pub communities: usize,
@@ -19,23 +18,23 @@ pub struct EvolutionEngine<'a> {
     pub multiverse: Multiverse,
     pub task: &'a dyn SingleStepTask,
     pub executor: AgentExecutor<'a>,
-    pub spawner: AgentSpawner,
 }
 
 pub trait EvolutionHook {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool;
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool;
 }
 
 impl<T: EvolutionHook> EvolutionHook for &mut T {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
         (**self).on_generation_complete(generation, multiverse)
     }
 }
 
 impl EvolutionHook for Vec<Box<dyn EvolutionHook>> {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
-        self.iter_mut()
-            .fold(true, |acc, hook| hook.on_generation_complete(generation, multiverse) && acc)
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
+        self.iter_mut().fold(true, |acc, hook| {
+            hook.on_generation_complete(generation, multiverse) && acc
+        })
     }
 }
 
@@ -44,7 +43,6 @@ impl<'a> EvolutionEngine<'a> {
         config: EvolutionConfig,
         multiverse: Multiverse,
         task: &'a dyn SingleStepTask,
-        spawner: AgentSpawner,
     ) -> Self {
         let executor = AgentExecutor::new(&OP_COSTS);
         Self {
@@ -52,11 +50,14 @@ impl<'a> EvolutionEngine<'a> {
             multiverse,
             task,
             executor,
-            spawner,
         }
     }
 
-    pub fn run<H: EvolutionHook>(&mut self, rng: &mut impl rand::Rng, mut hook: H) -> anyhow::Result<()> {
+    pub fn run<H: EvolutionHook>(
+        &mut self,
+        rng: &mut impl rand::Rng,
+        mut hook: H,
+    ) -> anyhow::Result<()> {
         let runner = SimulationRunner::new(&self.executor);
 
         for generation in 0..=self.config.max_generations {
@@ -65,15 +66,13 @@ impl<'a> EvolutionEngine<'a> {
                 self.task,
                 self.config.tick_energy_budget,
                 self.config.ticks_per_gen,
-                self.config.min_population,
-                || self.spawner.new_random(rng),
             );
 
-            runner.mutate(rng, &mut self.multiverse);
+            crate::sim::core::mutate_all(&mut self.multiverse, rng);
 
-            let should_continue = hook.on_generation_complete(generation, &self.multiverse);
+            let should_continue = hook.on_generation_complete(generation, &mut self.multiverse);
 
-            if self.multiverse.survivor_count() == 0 || !should_continue {
+            if self.multiverse.population == 0 || !should_continue {
                 break;
             }
         }

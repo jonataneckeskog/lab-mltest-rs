@@ -1,7 +1,9 @@
+use crate::core::SingleStepTask;
+use crate::evolution::hooks::basics::PopulationBalancerHook;
+use crate::evolution::hooks::{CheckpointHook, PopulationTargetHook, PrintStatsHook};
 use crate::evolution::{EvolutionConfig, EvolutionEngine, EvolutionHook};
-use crate::evolution::hooks::{PrintStatsHook, PopulationTargetHook, CheckpointHook};
-use crate::sim::{Multiverse, SingleStepTask};
 use crate::neural::AgentSpawner;
+use crate::sim::Multiverse;
 use std::path::PathBuf;
 
 /// Creates a standard simulation setup for testing tasks.
@@ -21,6 +23,13 @@ pub fn create_test_sim<'a>(
 
     let (engine, mut hooks) = create_pluggable_engine(config, task, Vec::new());
 
+    hooks.push(Box::new(PopulationBalancerHook {
+        min_population: 20,
+        refill_fn: Box::new(move || {
+            (AgentSpawner { spawn_energy: 5.0 }).new_random(&mut rand::rng())
+        }),
+        rng: Box::new(rand::rng()),
+    }));
     hooks.push(Box::new(PrintStatsHook {
         interval: 10,
         highest_survivors: 0,
@@ -50,11 +59,7 @@ pub fn create_pluggable_engine<'a>(
         config.starting_energy,
     );
 
-    let spawner = AgentSpawner {
-        spawn_energy: config.starting_energy,
-    };
-
-    let engine = EvolutionEngine::new(config, multiverse, task, spawner);
+    let engine = EvolutionEngine::new(config, multiverse, task);
 
     (engine, hooks)
 }

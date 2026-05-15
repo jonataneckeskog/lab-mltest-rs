@@ -1,21 +1,19 @@
+use crate::core::AgentId;
 use crate::neural::{
+    GeneticBlueprint,
     agent::Agent,
-    genome::Genome,
     memory::{Bank, BankMetadata},
 };
-
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AgentId(pub usize);
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub struct AgentManifest {
     pub energy: f32,
     pub age: u64,
-    pub base_genome_path: PathBuf,
+    pub blueprint_path: PathBuf,
     pub genome_path: PathBuf,
     pub banks: BankManifest,
     pub id: AgentId,
@@ -31,7 +29,7 @@ impl<const N: usize> Bank<N>
 where
     Self: BankMetadata,
 {
-    pub fn save(&self, id: usize, folder: &Path) -> std::io::Result<BankManifest> {
+    pub fn save(&self, id: u64, folder: &Path) -> std::io::Result<BankManifest> {
         let filename = format!("{}_{}.bin", Self::PREFIX, id);
         let path = folder.join(&filename);
         let bytes = bincode::serialize(self)
@@ -66,19 +64,23 @@ impl BankManifest {
 impl Agent {
     pub fn save(&self, id: AgentId, folder: &Path) -> std::io::Result<AgentManifest> {
         let genome_filename = format!("genome_{}.bin", id.0);
-        let base_genome_filename = format!("base_genome_{}.bin", id.0);
+        let blueprint_filename = format!("blueprint_{}.bin", id.0);
+
+        // Save current working genome
         std::fs::write(folder.join(&genome_filename), &self.genome)?;
-        std::fs::write(
-            folder.join(&base_genome_filename),
-            self.base_genome.0.as_ref(),
-        )?;
+
+        // Save the entire blueprint (lineage)
+        let blueprint_bytes = bincode::serialize(self.blueprint.as_ref())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(folder.join(&blueprint_filename), blueprint_bytes)?;
+
         let bank_manifest = self.private_banks.save(id.0, folder)?;
 
         Ok(AgentManifest {
             energy: self.energy.0,
             age: self.age,
             genome_path: PathBuf::from(genome_filename),
-            base_genome_path: PathBuf::from(base_genome_filename),
+            blueprint_path: PathBuf::from(blueprint_filename),
             banks: bank_manifest,
             id: id,
         })
@@ -87,14 +89,15 @@ impl Agent {
 
 impl AgentManifest {
     pub fn load(&self, base_dir: &Path) -> anyhow::Result<Agent> {
-        let genome = std::fs::read(base_dir.join(&self.genome_path))?;
-        let base_genome = std::fs::read(base_dir.join(&self.base_genome_path))?;
+        let genome_data = std::fs::read(base_dir.join(&self.genome_path))?;
+        let blueprint_bytes = std::fs::read(base_dir.join(&self.blueprint_path))?;
+        let blueprint: GeneticBlueprint = bincode::deserialize(&blueprint_bytes)?;
 
         let banks = self.banks.load(base_dir)?;
 
         Ok(Agent {
-            genome: genome,
-            base_genome: Genome::new(base_genome),
+            blueprint: Arc::new(blueprint),
+            genome: genome_data,
             private_banks: banks,
             energy: OrderedFloat(self.energy),
             age: self.age,
@@ -163,6 +166,7 @@ mod tests {
         agent.save(AgentId(1), dir.path())?;
 
         assert!(dir.path().join("genome_1.bin").exists());
+        assert!(dir.path().join("blueprint_1.bin").exists());
         assert!(dir.path().join("private_banks_1.bin").exists());
         Ok(())
     }
@@ -178,6 +182,7 @@ mod tests {
         assert_eq!(original.genome, recovered.genome);
         assert_eq!(original.energy, recovered.energy);
         assert_eq!(original.private_banks, recovered.private_banks);
+        assert_eq!(original.blueprint, recovered.blueprint);
         Ok(())
     }
 
@@ -187,7 +192,7 @@ mod tests {
         let manifest = AgentManifest {
             energy: 10.0,
             age: 5,
-            base_genome_path: PathBuf::from("bg.bin"),
+            blueprint_path: PathBuf::from("bg.bin"),
             genome_path: PathBuf::from("g.bin"),
             banks: BankManifest {
                 raw_data_path: PathBuf::from("b.bin"),
@@ -208,7 +213,7 @@ mod tests {
     #[test]
     fn test_save_with_nonexistent_folder_fails() {
         let agent = create_test_agent();
-        let result = agent.save(AgentId(0), Path::new("/definitely/not/a/real/path"));
+        let result = agent.save(AgentId(0), Path::new("/definitely/not/real/path"));
         assert!(result.is_err());
     }
 
