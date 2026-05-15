@@ -1,5 +1,4 @@
 use crate::core::SingleStepTask;
-use crate::neural::AgentSpawner;
 use crate::sim::Multiverse;
 use crate::sim::SimulationRunner;
 use crate::vm::AgentExecutor;
@@ -19,21 +18,20 @@ pub struct EvolutionEngine<'a> {
     pub multiverse: Multiverse,
     pub task: &'a dyn SingleStepTask,
     pub executor: AgentExecutor<'a>,
-    pub spawner: AgentSpawner,
 }
 
 pub trait EvolutionHook {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool;
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool;
 }
 
 impl<T: EvolutionHook> EvolutionHook for &mut T {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
         (**self).on_generation_complete(generation, multiverse)
     }
 }
 
 impl EvolutionHook for Vec<Box<dyn EvolutionHook>> {
-    fn on_generation_complete(&mut self, generation: usize, multiverse: &Multiverse) -> bool {
+    fn on_generation_complete(&mut self, generation: usize, multiverse: &mut Multiverse) -> bool {
         self.iter_mut().fold(true, |acc, hook| {
             hook.on_generation_complete(generation, multiverse) && acc
         })
@@ -45,7 +43,6 @@ impl<'a> EvolutionEngine<'a> {
         config: EvolutionConfig,
         multiverse: Multiverse,
         task: &'a dyn SingleStepTask,
-        spawner: AgentSpawner,
     ) -> Self {
         let executor = AgentExecutor::new(&OP_COSTS);
         Self {
@@ -53,7 +50,6 @@ impl<'a> EvolutionEngine<'a> {
             multiverse,
             task,
             executor,
-            spawner,
         }
     }
 
@@ -70,13 +66,11 @@ impl<'a> EvolutionEngine<'a> {
                 self.task,
                 self.config.tick_energy_budget,
                 self.config.ticks_per_gen,
-                self.config.min_population,
-                || self.spawner.new_random(rng),
             );
 
             crate::sim::core::mutate_all(&mut self.multiverse, rng);
 
-            let should_continue = hook.on_generation_complete(generation, &self.multiverse);
+            let should_continue = hook.on_generation_complete(generation, &mut self.multiverse);
 
             if self.multiverse.population == 0 || !should_continue {
                 break;

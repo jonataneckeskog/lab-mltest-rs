@@ -3,6 +3,7 @@ use crate::{
     core::{AgentId, CommunityId},
     neural::{Agent, AgentSpawner},
 };
+use rand::RngExt;
 use std::collections::HashMap;
 
 pub struct Multiverse {
@@ -81,13 +82,20 @@ impl Multiverse {
         }
     }
 
-    /// Add an agent to a random community without requiring RNG.
-    pub fn add_agent_to_random_community(&mut self, agent: Agent) -> AgentId {
+    /// Add an agent to a random community.
+    pub fn add_agent_to_random_community(
+        &mut self,
+        rng: &mut impl rand::Rng,
+        agent: Agent,
+    ) -> AgentId {
         let comm_id = if self.spaces.is_empty() {
             CommunityId(0)
         } else {
-            *self.spaces.keys().next().unwrap()
+            let random_index = rng.random_range(0..self.spaces.len());
+
+            *self.spaces.keys().nth(random_index).unwrap()
         };
+
         self.add_agent_to_community(comm_id, agent)
     }
 

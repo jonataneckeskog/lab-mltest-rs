@@ -1,9 +1,9 @@
 use crate::{
     core::{AgentId, SingleStepTask},
-    neural::{Agent, AgentVmMemory},
+    neural::AgentVmMemory,
     sim::core::{SimulationContext, SimulationEvent},
-    sim::state::Multiverse,
     sim::runner::engine::SimulationRunner,
+    sim::state::Multiverse,
     vm::TerminationReason,
 };
 
@@ -15,11 +15,8 @@ impl<'a> SimulationRunner<'a> {
         task: &dyn SingleStepTask,
         total_energy: f32,
         max_steps: usize,
-        min_population: usize,
-        mut refill_fn: impl FnMut() -> Agent,
     ) {
-        let (scores, all_events, dead_agents) =
-            self.run_population(multiverse, task, max_steps);
+        let (scores, all_events, dead_agents) = self.run_population(multiverse, task, max_steps);
 
         // 1. Kill agents that died during execution
         for agent_id in dead_agents {
@@ -31,12 +28,6 @@ impl<'a> SimulationRunner<'a> {
 
         // 3. Resolve Events (Spawn/Migration)
         crate::sim::core::resolve_events(multiverse, all_events);
-
-        // 4. Population Balancing
-        while multiverse.population < min_population {
-            let new_agent = refill_fn();
-            multiverse.add_agent_to_random_community(new_agent);
-        }
     }
 
     /// Run a single step task across an entire population.
@@ -46,11 +37,7 @@ impl<'a> SimulationRunner<'a> {
         multiverse: &mut Multiverse,
         task: &dyn SingleStepTask,
         max_steps: usize,
-    ) -> (
-        Vec<(AgentId, f32)>,
-        Vec<SimulationEvent>,
-        Vec<AgentId>,
-    ) {
+    ) -> (Vec<(AgentId, f32)>, Vec<SimulationEvent>, Vec<AgentId>) {
         let mut all_events = Vec::new();
         let mut scores = Vec::new();
         let mut dead_agents = Vec::new();
@@ -99,7 +86,7 @@ impl<'a> SimulationRunner<'a> {
             for (agent_id, score) in scores {
                 let proportion = score / total_score;
                 let reward = proportion * total_energy;
-                
+
                 // O(1) lookup to apply reward
                 if let Some(comm_id) = multiverse.agent_locations.get(&agent_id) {
                     if let Some(comm) = multiverse.spaces.get_mut(comm_id) {
