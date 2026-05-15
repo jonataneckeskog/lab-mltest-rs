@@ -111,10 +111,6 @@ impl Multiverse {
         })
     }
 
-    pub fn survivor_count(&self) -> usize {
-        self.agents().count()
-    }
-
     pub fn get_max_energy(&self) -> f32 {
         self.agents()
             .map(|(_, _, a)| a.energy.0)
@@ -122,18 +118,22 @@ impl Multiverse {
     }
 
     pub fn get_energy_stats(&self) -> (f32, f32, f32) {
-        let energies: Vec<f32> = self.agents().map(|(_, _, a)| a.energy.0).collect();
-
-        if energies.is_empty() {
+        if self.population == 0 {
             return (0.0, 0.0, 0.0);
         }
 
-        let min = energies.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-        let max = energies.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
-        let sum: f32 = energies.iter().sum();
-        let avg = sum / energies.len() as f32;
+        let mut min = f32::INFINITY;
+        let mut max = f32::NEG_INFINITY;
+        let mut sum = 0.0;
 
-        (min, max, avg)
+        for (_, _, agent) in self.agents() {
+            let e = agent.energy.0;
+            min = min.min(e);
+            max = max.max(e);
+            sum += e;
+        }
+
+        (min, max, sum / self.population as f32)
     }
 
     pub fn remove_agent(&mut self, agent_id: AgentId) -> Option<(CommunityId, Agent)> {
