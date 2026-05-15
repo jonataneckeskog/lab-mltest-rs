@@ -1,6 +1,6 @@
 use crate::core::{AgentId, CommunityId};
 use crate::neural::{Agent, SharedBanks};
-use crate::sim::multiverse::{Community, Multiverse};
+use crate::sim::{Community, Multiverse};
 use crate::storage::agent::{AgentManifest, BankManifest};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};

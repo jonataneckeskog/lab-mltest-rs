@@ -75,7 +75,7 @@ impl VmContext for SimulationContext {
 mod tests {
     use super::*;
     use crate::vm::ByteStack;
-    use crate::vm::isa::op;
+    use crate::vm::op;
 
     #[test]
     fn test_leave_community_syscall() {

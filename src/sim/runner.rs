@@ -87,7 +87,7 @@ impl<'a> SimulationRunner<'a> {
 
         for (comm_id, community) in spaces {
             for (agent_id, agent) in &mut community.agents {
-                agent.age += 1; // Increment age every tick
+                agent.age += 1;
                 agent.load_input(input);
 
                 let mut ctx = SimulationContext::new(*agent_id, *comm_id);
@@ -136,7 +136,7 @@ impl<'a> SimulationRunner<'a> {
 
             match summary.reason {
                 TerminationReason::Died => {
-                    session.agent.set_energy(0.0);
+                    session.agent.energy.0 = 0.0;
                     return; // Stop immediately on death
                 }
                 _ => {

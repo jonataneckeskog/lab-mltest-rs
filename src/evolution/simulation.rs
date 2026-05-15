@@ -1,9 +1,9 @@
 use crate::core::SingleStepTask;
 use crate::neural::AgentSpawner;
-use crate::neural::config::OP_COSTS;
 use crate::sim::Multiverse;
 use crate::sim::SimulationRunner;
 use crate::vm::AgentExecutor;
+use crate::vm::OP_COSTS;
 
 pub struct EvolutionConfig {
     pub communities: usize,

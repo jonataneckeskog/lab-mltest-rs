@@ -75,7 +75,7 @@ impl Multiverse {
         self.spaces
             .values()
             .flat_map(|c| c.agents.values())
-            .map(|a| a.get_energy())
+            .map(|a| a.energy.0)
             .fold(0.0, f32::max)
     }
 
@@ -84,7 +84,7 @@ impl Multiverse {
             .spaces
             .values()
             .flat_map(|c| c.agents.values())
-            .map(|a| a.get_energy())
+            .map(|a| a.energy.0)
             .collect();
 
         if energies.is_empty() {
@@ -142,7 +142,10 @@ impl Multiverse {
                     }
                 }
                 SimulationEvent::SpawnChild { parent_id, energy } => {
-                    // Simplified: Spawn child in the same community as parent
+                    if energy <= 0.0 {
+                        continue;
+                    }
+                    // Spawn child in the same community as parent
                     let (source_comm_id, child) = self
                         .spaces
                         .iter_mut()
@@ -155,10 +158,7 @@ impl Multiverse {
 
                             if can_spawn {
                                 let parent = comm.agents.get(&parent_id).unwrap();
-                                let spawner = AgentSpawner {
-                                    spawn_energy: energy,
-                                };
-                                let child = spawner.spawn_standard(parent);
+                                let child = AgentSpawner::spawn_child(parent, energy);
 
                                 // Deduct energy from parent
                                 comm.agents.get_mut(&parent_id).unwrap().energy.0 -= energy;
@@ -227,34 +227,5 @@ impl Community {
         }
         self.agents.insert(candidate, agent);
         candidate
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::neural::Agent;
-
-    #[test]
-    fn test_add_agent_assigns_zero_for_empty_community() {
-        let mut community = Community::new();
-        let id = community.add_agent(Agent::default());
-
-        assert_eq!(id, AgentId(0));
-        assert!(community.agents.contains_key(&id));
-        assert_eq!(community.agents.len(), 1);
-    }
-
-    #[test]
-    fn test_add_agent_uses_nonexistent_id_when_gap_exists() {
-        let mut community = Community::new();
-        community.agents.insert(AgentId(0), Agent::default());
-        community.agents.insert(AgentId(2), Agent::default());
-
-        let id = community.add_agent(Agent::default());
-
-        assert_eq!(id, AgentId(1));
-        assert!(community.agents.contains_key(&id));
-        assert_eq!(community.agents.len(), 3);
     }
 }

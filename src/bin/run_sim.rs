@@ -9,11 +9,11 @@ fn main() -> anyhow::Result<()> {
     // 1. Define a custom configuration
     let config = EvolutionConfig {
         communities: 2,
-        min_population: 50,
+        min_population: 2,
         starting_energy: 10.0,
-        tick_energy_budget: 50.0,
-        ticks_per_gen: 200,
-        max_generations: 500,
+        tick_energy_budget: 10.0,
+        ticks_per_gen: 100,
+        max_generations: 1000,
     };
 
     // 2. Prepare your own specific set of plugins/hooks
@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
         highest_survivors: 0,
     }));
     my_plugins.push(Box::new(CheckpointHook {
-        interval: 100,
+        interval: 50,
         dir: PathBuf::from("sim_checkpoints"),
     }));
 
