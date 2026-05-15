@@ -78,7 +78,7 @@ impl<'a> EvolutionEngine<'a> {
 
             let should_continue = hook.on_generation_complete(generation, &self.multiverse);
 
-            if self.multiverse.survivor_count() == 0 || !should_continue {
+            if self.multiverse.population == 0 || !should_continue {
                 break;
             }
         }

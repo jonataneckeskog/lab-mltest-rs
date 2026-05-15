@@ -67,10 +67,6 @@ impl Multiverse {
         self.add_agent_to_community(comm_id, agent)
     }
 
-    pub fn survivor_count(&self) -> usize {
-        self.spaces.values().map(|c| c.agents.len()).sum()
-    }
-
     pub fn get_max_energy(&self) -> f32 {
         self.spaces
             .values()
